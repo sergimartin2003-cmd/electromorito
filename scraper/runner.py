@@ -7,7 +7,7 @@ from typing import Dict, List
 
 from .config import Config
 from .crawl import _USER_AGENT, analizar_web, robots_permite
-from .search import buscar
+from .search import aviso_buscador, buscar
 from .storage import Almacen
 from .util import dominio_registrable, espera_aleatoria
 
@@ -122,6 +122,7 @@ def ejecutar(config: Config) -> None:
 
         page = contexto.new_page()
 
+        vacios_seguidos = 0
         try:
             for i, (categoria, provincia, consulta) in enumerate(consultas, start=1):
                 _log(f"[{i}/{len(consultas)}] Buscando: '{consulta}'")
@@ -131,6 +132,12 @@ def ejecutar(config: Config) -> None:
                     _log(f"    Error en la búsqueda: {e}")
                     urls = []
                 _log(f"    -> {len(urls)} webs candidatas")
+
+                # Detecta posible bloqueo del buscador (muchas búsquedas seguidas vacías)
+                vacios_seguidos = vacios_seguidos + 1 if not urls else 0
+                aviso = aviso_buscador(vacios_seguidos)
+                if aviso:
+                    _log(f"    ⚠ {aviso}")
 
                 for url in urls:
                     dom = dominio_registrable(url)

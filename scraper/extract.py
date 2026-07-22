@@ -16,7 +16,8 @@ _ASSET_EXT = (
     ".mp4", ".mp3", ".pdf", ".zip",
 )
 
-# Dominios que no corresponden a correos de contacto reales (ejemplos, plantillas, trackers…)
+# Dominios que no corresponden a correos de contacto reales (ejemplos, plantillas,
+# trackers, plataformas web, proveedores de hosting/CMS…)
 _DOMINIOS_RUIDO = {
     "example.com", "example.org", "example.net", "domain.com", "email.com",
     "yourdomain.com", "your-email.com", "tudominio.com", "tuempresa.com",
@@ -24,12 +25,18 @@ _DOMINIOS_RUIDO = {
     "schema.org", "googleapis.com", "gstatic.com", "cloudflare.com",
     "test.com", "correo.com", "nombre.com", "dominio.com", "mail.com",
     "sentry.wixpress.com", "core.trace.moz.com",
+    # Plataformas web / CMS / marketing (suelen ser del desarrollador, no del cliente)
+    "wordpress.com", "wordpress.org", "wixsite.com", "squarespace.com",
+    "elementor.com", "mailchimp.com", "sentry-next.wixpress.com",
+    "jimdo.com", "webnode.es", "1and1.com", "ionos.es", "shopify.com",
 }
 
-# Partes locales genéricas de ejemplos ("nombre@…", "tucorreo@…")
+# Partes locales genéricas de ejemplos o de sistema (no son un contacto útil)
 _LOCAL_RUIDO = {
     "email", "correo", "tucorreo", "tuemail", "nombre", "usuario", "user",
     "name", "example", "ejemplo", "sentry", "no-reply", "noreply",
+    "nombre.apellido", "nombreapellido", "tunombre", "tu-correo",
+    "wordpress", "postmaster", "mailer-daemon", "abuse",
 }
 
 # --- Teléfonos (formato español) ----------------------------------------

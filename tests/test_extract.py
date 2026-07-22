@@ -45,6 +45,11 @@ def test_filtra_dominios_malformados():
     assert extraer_correos("malo@fund..org bien@fund.org") == ["bien@fund.org"]
 
 
+def test_filtra_plataformas_web_y_sistema():
+    ruido = "web@wordpress.com postmaster@fundacion.org nombre.apellido@x.org"
+    assert extraer_correos(ruido + " real@centro.es") == ["real@centro.es"]
+
+
 def test_correos_sin_duplicados_y_ordenados():
     txt = "b@x.es a@x.es b@x.es"
     assert extraer_correos(txt) == ["a@x.es", "b@x.es"]

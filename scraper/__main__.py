@@ -39,6 +39,18 @@ def main() -> None:
         "--informe", action="store_true",
         help="No rastrea: solo regenera el informe HTML a partir del CSV ya existente.",
     )
+    parser.add_argument(
+        "--reiniciar", action="store_true",
+        help="Borra los resultados previos y empieza de cero (no reanuda).",
+    )
+    parser.add_argument(
+        "--solo-relevantes", action="store_true",
+        help="Guarda solo las webs con alguna palabra del tema (relevancia > 0).",
+    )
+    parser.add_argument(
+        "--salida", "-o", default=None,
+        help="Nombre base de los ficheros de salida (sobrescribe config.yaml).",
+    )
     args = parser.parse_args()
 
     try:
@@ -46,6 +58,11 @@ def main() -> None:
     except (FileNotFoundError, ValueError) as e:
         print(f"ERROR de configuración: {e}")
         sys.exit(1)
+
+    if args.salida:
+        config.archivo_salida = args.salida
+    if args.solo_relevantes:
+        config.guardar_solo_relevantes = True
 
     if args.informe:
         from .report import generar_informe
@@ -55,6 +72,11 @@ def main() -> None:
         else:
             print(f"No existe {config.archivo_salida}.csv. Ejecuta primero el scraper.")
         return
+
+    if args.reiniciar:
+        from .storage import limpiar_salidas
+        borrados = limpiar_salidas(config.archivo_salida)
+        print(f"  [reiniciar] {len(borrados)} fichero(s) de salida borrados.\n")
 
     if args.prueba:
         config.max_busquedas = 3

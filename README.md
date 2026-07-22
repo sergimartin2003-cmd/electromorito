@@ -94,10 +94,23 @@ python run.py
 python run.py -c mi_config.yaml
 ```
 
+Opciones disponibles:
+
+| Opción | Qué hace |
+|---|---|
+| `--prueba` | Limita a 3 búsquedas (para comprobar que todo va). |
+| `--reiniciar` | Borra los resultados previos y empieza de cero (no reanuda). |
+| `--solo-relevantes` | Guarda solo webs con alguna palabra del tema (relevancia > 0). |
+| `--salida NOMBRE` / `-o` | Nombre base de los ficheros de salida. |
+| `--informe` | No rastrea: solo regenera el panel HTML desde el CSV. |
+| `-c ARCHIVO` | Usa otro archivo de configuración. |
+
 - Puedes **detenerlo en cualquier momento** con `Ctrl + C`: lo ya recogido queda
   guardado en el CSV.
 - Si vuelves a lanzarlo, **reanuda** saltándose los dominios ya visitados
-  (recordados en `resultados_dominios_visitados.txt`).
+  (recordados en `resultados_dominios_visitados.txt`). Usa `--reiniciar` para no reanudar.
+- Si el buscador empieza a limitar las peticiones (muchas búsquedas seguidas sin
+  resultados), el programa te **avisa** para que subas las esperas o cambies de buscador.
 
 ### Resultado
 

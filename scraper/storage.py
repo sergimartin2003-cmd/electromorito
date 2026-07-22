@@ -20,6 +20,23 @@ CAMPOS = [
 ]
 
 
+def limpiar_salidas(base: str) -> List[str]:
+    """Borra los ficheros de una ejecución previa (para empezar de cero).
+
+    Devuelve la lista de ficheros que se borraron.
+    """
+    borrados = []
+    for ruta in (base + ".csv", base + ".xlsx", base + ".html",
+                 base + "_dominios_visitados.txt"):
+        if os.path.exists(ruta):
+            try:
+                os.remove(ruta)
+                borrados.append(ruta)
+            except Exception:
+                pass
+    return borrados
+
+
 class Almacen:
     def __init__(self, config) -> None:
         base = config.archivo_salida

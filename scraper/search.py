@@ -25,6 +25,22 @@ def buscar(page, consulta: str, config: Config) -> List[str]:
     return _buscar_duckduckgo(page, consulta, config)
 
 
+def aviso_buscador(consecutivos_vacios: int) -> str | None:
+    """Devuelve un aviso si demasiadas búsquedas seguidas no dan resultados.
+
+    Suele indicar que el buscador está limitando las peticiones automáticas.
+    Devuelve None si no hay que avisar todavía.
+    """
+    if consecutivos_vacios == 5:
+        return ("AVISO: 5 búsquedas seguidas sin resultados. El buscador podría estar "
+                "limitando las peticiones. Prueba a subir 'espera_min_segundos' y "
+                "'espera_max_segundos', o cambia 'motor_busqueda' (duckduckgo/bing).")
+    if consecutivos_vacios and consecutivos_vacios % 15 == 0:
+        return (f"AVISO: {consecutivos_vacios} búsquedas seguidas sin resultados. "
+                "Considera detener (Ctrl+C) y reanudar más tarde con más espera.")
+    return None
+
+
 # --- DuckDuckGo ----------------------------------------------------------
 def _decodificar_ddg(href: str) -> str | None:
     """Los enlaces de DuckDuckGo van envueltos en un redirect //duckduckgo.com/l/?uddg=..."""
