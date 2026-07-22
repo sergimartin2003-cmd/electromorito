@@ -58,6 +58,14 @@ def _buscar_duckduckgo(page, consulta: str, config: Config) -> List[str]:
         )
     except Exception:
         hrefs = []
+    # Respaldo por si cambia el marcado: cualquier enlace con el redirect 'uddg='
+    if not hrefs:
+        try:
+            hrefs = page.eval_on_selector_all(
+                "a[href*='uddg=']", "els => els.map(e => e.getAttribute('href'))"
+            )
+        except Exception:
+            hrefs = []
 
     urls: List[str] = []
     for href in hrefs:
@@ -86,5 +94,12 @@ def _buscar_bing(page, consulta: str, config: Config) -> List[str]:
             )
         except Exception:
             hrefs = []
+        if not hrefs:
+            try:
+                hrefs = page.eval_on_selector_all(
+                    "#b_results h2 a", "els => els.map(e => e.href)"
+                )
+            except Exception:
+                hrefs = []
         urls.extend(h for h in hrefs if h and h.startswith("http"))
     return urls

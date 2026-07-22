@@ -37,9 +37,11 @@ _LOCAL_RUIDO = {
 # empiezan por 6,7,8 o 9, permitiendo separadores (espacio, punto, guion).
 # Los límites (?<![\w\d]) / (?![\w\d]) evitan cazar trozos dentro de hashes o
 # de números más largos (checksums, identificadores, etc.).
+# Nota: los separadores internos son solo espacio, punto y guion (NO \s), para
+# no unir por error dos números que estén en líneas distintas.
 _TEL_CANDIDATO = re.compile(
     r"(?<![\w\d])"
-    r"((?:(?:\+|00)\s?34[\s.\-]?)?[6789][\d\s.\-]{7,13}\d)"
+    r"((?:(?:\+|00)\s?34[ .\-]?)?[6789][\d .\-]{7,13}\d)"
     r"(?![\w\d])"
 )
 
@@ -70,6 +72,9 @@ def _correo_valido(correo: str) -> bool:
         return False
     local, _, dominio = correo.partition("@")
     if not local or not dominio or "." not in dominio:
+        return False
+    # Dominios mal formados (puntos dobles o al principio/fin)
+    if ".." in dominio or dominio.startswith(".") or dominio.endswith("."):
         return False
     if dominio in _DOMINIOS_RUIDO or local in _LOCAL_RUIDO:
         return False

@@ -13,7 +13,12 @@ from .util import dominio_registrable, espera_aleatoria
 
 
 def _log(msg: str) -> None:
-    print(msg, flush=True)
+    """Imprime siendo tolerante con consolas que no aceptan ciertos caracteres (Windows)."""
+    try:
+        print(msg, flush=True)
+    except UnicodeEncodeError:
+        enc = (getattr(sys.stdout, "encoding", None) or "utf-8")
+        print(msg.encode(enc, errors="replace").decode(enc, errors="replace"), flush=True)
 
 
 def _dominio_excluido(url: str, config: Config) -> bool:
@@ -41,9 +46,19 @@ def _filtrar_urls(urls: List[str], config: Config) -> List[str]:
             continue
         vistos.add(dom)
         limpias.append(url)
-        if len(limpias) >= config.resultados_por_busqueda:
+        if config.resultados_por_busqueda > 0 and len(limpias) >= config.resultados_por_busqueda:
             break
     return limpias
+
+
+def _lanzar_navegador(p, config: Config):
+    """Lanza Chromium. Reintenta con --no-sandbox (necesario en algunos Linux)."""
+    args = ["--disable-blink-features=AutomationControlled"]
+    headless = not config.navegador_visible
+    try:
+        return p.chromium.launch(headless=headless, args=args)
+    except Exception:
+        return p.chromium.launch(headless=headless, args=args + ["--no-sandbox"])
 
 
 def ejecutar(config: Config) -> None:
@@ -76,7 +91,17 @@ def ejecutar(config: Config) -> None:
     total_orgs = 0
 
     with sync_playwright() as p:
-        navegador = p.chromium.launch(headless=not config.navegador_visible)
+        try:
+            navegador = _lanzar_navegador(p, config)
+        except Exception as e:  # noqa: BLE001
+            _log(
+                "\nERROR: no se pudo abrir el navegador Chromium.\n"
+                f"Detalle: {e}\n\n"
+                "Asegúrate de haber ejecutado:\n"
+                "    playwright install chromium\n"
+            )
+            return
+
         contexto = navegador.new_context(
             user_agent=_USER_AGENT,
             locale="es-ES",
@@ -85,10 +110,14 @@ def ejecutar(config: Config) -> None:
 
         if config.bloquear_recursos:
             def _ruta(route):
-                if route.request.resource_type in ("image", "media", "font", "stylesheet"):
-                    route.abort()
-                else:
-                    route.continue_()
+                try:
+                    if route.request.resource_type in ("image", "media", "font", "stylesheet"):
+                        route.abort()
+                    else:
+                        route.continue_()
+                except Exception:
+                    # La página pudo cerrarse o la petición ya estar resuelta.
+                    pass
             contexto.route("**/*", _ruta)
 
         page = contexto.new_page()

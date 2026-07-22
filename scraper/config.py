@@ -48,6 +48,12 @@ class Config:
         with open(ruta, "r", encoding="utf-8") as f:
             datos = yaml.safe_load(f) or {}
 
+        if not isinstance(datos, dict):
+            raise ValueError(
+                "El archivo config.yaml no tiene el formato esperado "
+                "(debe ser una lista de 'clave: valor')."
+            )
+
         conocidas = {c.name for c in cls.__dataclass_fields__.values()}
         filtrado = {k: v for k, v in datos.items() if k in conocidas}
         desconocidas = set(datos) - conocidas
@@ -59,12 +65,42 @@ class Config:
         return cfg
 
     def _validar(self) -> None:
+        # Las listas escritas vacías en YAML quedan como None: las normalizamos.
+        for campo in ("categorias", "ubicaciones", "busquedas_extra", "dominios_excluidos"):
+            valor = getattr(self, campo)
+            if valor is None:
+                setattr(self, campo, [])
+            elif not isinstance(valor, list):
+                setattr(self, campo, [str(valor)])
+            else:
+                setattr(
+                    self,
+                    campo,
+                    [str(v).strip() for v in valor if v is not None and str(v).strip()],
+                )
+
+        # Números y booleanos: el usuario podría escribirlos como texto en el YAML.
+        self.resultados_por_busqueda = _entero(self.resultados_por_busqueda, 15, minimo=1)
+        self.paginas_por_busqueda = _entero(self.paginas_por_busqueda, 1, minimo=1)
+        self.max_paginas_por_web = _entero(self.max_paginas_por_web, 4, minimo=1)
+        self.max_busquedas = _entero(self.max_busquedas, 0, minimo=0)
+        self.timeout_segundos = _entero(self.timeout_segundos, 30, minimo=5)
+        self.espera_min_segundos = _decimal(self.espera_min_segundos, 2.0, minimo=0.0)
+        self.espera_max_segundos = _decimal(self.espera_max_segundos, 5.0, minimo=0.0)
+        self.navegador_visible = _booleano(self.navegador_visible, True)
+        self.bloquear_recursos = _booleano(self.bloquear_recursos, True)
+        self.respetar_robots = _booleano(self.respetar_robots, True)
+
+        self.motor_busqueda = str(self.motor_busqueda).strip().lower()
         if self.motor_busqueda not in ("duckduckgo", "bing"):
             raise ValueError(
                 f"motor_busqueda '{self.motor_busqueda}' no válido. Usa 'duckduckgo' o 'bing'."
             )
         if self.espera_max_segundos < self.espera_min_segundos:
             self.espera_max_segundos = self.espera_min_segundos
+        if not self.archivo_salida or not str(self.archivo_salida).strip():
+            self.archivo_salida = "resultados"
+        self.archivo_salida = str(self.archivo_salida).strip()
         if not self.categorias and not self.busquedas_extra:
             raise ValueError(
                 "No hay nada que buscar: define 'categorias' o 'busquedas_extra' en config.yaml."
@@ -100,3 +136,37 @@ class Config:
         if self.max_busquedas and self.max_busquedas > 0:
             pares = pares[: self.max_busquedas]
         return pares
+
+
+# --- Coerción de tipos desde el YAML (tolerante con errores del usuario) -----
+def _entero(valor, por_defecto: int, minimo: int | None = None) -> int:
+    try:
+        n = int(float(valor))
+    except (TypeError, ValueError):
+        return por_defecto
+    if minimo is not None and n < minimo:
+        return minimo
+    return n
+
+
+def _decimal(valor, por_defecto: float, minimo: float | None = None) -> float:
+    try:
+        n = float(valor)
+    except (TypeError, ValueError):
+        return por_defecto
+    if minimo is not None and n < minimo:
+        return minimo
+    return n
+
+
+def _booleano(valor, por_defecto: bool) -> bool:
+    if isinstance(valor, bool):
+        return valor
+    if valor is None:
+        return por_defecto
+    texto = str(valor).strip().lower()
+    if texto in ("true", "si", "sí", "yes", "1", "on", "verdadero"):
+        return True
+    if texto in ("false", "no", "0", "off", "falso"):
+        return False
+    return por_defecto

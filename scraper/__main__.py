@@ -9,7 +9,20 @@ from .config import Config
 from .runner import ejecutar
 
 
+def _forzar_utf8() -> None:
+    """Hace que la consola use UTF-8 para que los acentos y símbolos se vean bien.
+
+    Especialmente útil en Windows, donde la consola suele usar cp1252.
+    """
+    for flujo in (sys.stdout, sys.stderr):
+        try:
+            flujo.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[attr-defined]
+        except Exception:
+            pass
+
+
 def main() -> None:
+    _forzar_utf8()
     parser = argparse.ArgumentParser(
         prog="scraper",
         description="Scraper de contactos de fundaciones, escuelas PFI/IFE y centros de estudios.",

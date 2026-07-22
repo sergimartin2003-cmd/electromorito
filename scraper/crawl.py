@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import urllib.error
+import urllib.request
 import urllib.robotparser
 from typing import Dict, List, Optional
 
@@ -22,8 +24,43 @@ _USER_AGENT = (
     "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 )
 
+# Tiempo máximo (segundos) para descargar un robots.txt: evita que un servidor
+# lento cuelgue todo el proceso (urllib.robotparser.read() no tiene timeout).
+_ROBOTS_TIMEOUT = 10
+
 # Caché de robots.txt por dominio para no descargarlo una y otra vez
 _cache_robots: Dict[str, Optional[urllib.robotparser.RobotFileParser]] = {}
+
+
+def _descargar_robots(dom: str) -> Optional[urllib.robotparser.RobotFileParser]:
+    """Descarga y analiza el robots.txt de un dominio con timeout.
+
+    Devuelve un RobotFileParser configurado, o None si no se pudo leer
+    (en cuyo caso se permite el acceso por defecto).
+    """
+    rp = urllib.robotparser.RobotFileParser()
+    url = f"https://{dom}/robots.txt"
+    rp.set_url(url)
+    try:
+        peticion = urllib.request.Request(url, headers={"User-Agent": _USER_AGENT})
+        with urllib.request.urlopen(peticion, timeout=_ROBOTS_TIMEOUT) as resp:
+            estado = getattr(resp, "status", 200) or 200
+            datos = resp.read(1_000_000)  # límite de tamaño por seguridad
+    except urllib.error.HTTPError as e:
+        estado = e.code
+        datos = b""
+    except Exception:
+        return None  # sin red / sin robots accesible -> permitir
+    if estado in (401, 403):
+        rp.disallow_all = True
+    elif estado >= 400:
+        rp.allow_all = True
+    else:
+        try:
+            rp.parse(datos.decode("utf-8", "ignore").splitlines())
+        except Exception:
+            return None
+    return rp
 
 
 def robots_permite(url: str, config: Config) -> bool:
@@ -34,13 +71,7 @@ def robots_permite(url: str, config: Config) -> bool:
     if not dom:
         return True
     if dom not in _cache_robots:
-        rp = urllib.robotparser.RobotFileParser()
-        rp.set_url(f"https://{dom}/robots.txt")
-        try:
-            rp.read()
-            _cache_robots[dom] = rp
-        except Exception:
-            _cache_robots[dom] = None  # no se pudo leer -> permitir
+        _cache_robots[dom] = _descargar_robots(dom)
     rp = _cache_robots[dom]
     if rp is None:
         return True
