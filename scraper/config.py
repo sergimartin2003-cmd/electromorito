@@ -31,6 +31,7 @@ class Config:
 
     espera_min_segundos: float = 2.0
     espera_max_segundos: float = 5.0
+    espera_adaptativa: bool = True
     respetar_robots: bool = True
 
     dominios_excluidos: List[str] = field(default_factory=list)
@@ -98,6 +99,7 @@ class Config:
         self.timeout_segundos = _entero(self.timeout_segundos, 30, minimo=5)
         self.espera_min_segundos = _decimal(self.espera_min_segundos, 2.0, minimo=0.0)
         self.espera_max_segundos = _decimal(self.espera_max_segundos, 5.0, minimo=0.0)
+        self.espera_adaptativa = _booleano(self.espera_adaptativa, True)
         self.navegador_visible = _booleano(self.navegador_visible, True)
         self.bloquear_recursos = _booleano(self.bloquear_recursos, True)
         self.respetar_robots = _booleano(self.respetar_robots, True)

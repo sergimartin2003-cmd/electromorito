@@ -4,7 +4,7 @@ import csv
 
 from scraper import util
 from scraper.storage import CAMPOS, Almacen
-from scraper.util import dominio, dominio_registrable, dominio_resuelve
+from scraper.util import EsperaAdaptativa, dominio, dominio_registrable, dominio_resuelve
 
 
 # --- util ----------------------------------------------------------------
@@ -34,6 +34,27 @@ def test_dominio_resuelve_usa_cache():
     util._cache_dns["no-resuelve.test"] = False
     assert dominio_resuelve("si-resuelve.test") is True
     assert dominio_resuelve("no-resuelve.test") is False
+
+
+# --- EsperaAdaptativa ----------------------------------------------------
+def test_espera_adaptativa_penaliza_con_tope():
+    e = EsperaAdaptativa(1.0, 2.0, factor=2.0, maximo=4.0)
+    assert e.multiplicador == 1.0
+    e.penalizar()
+    assert e.multiplicador == 2.0
+    e.penalizar()
+    assert e.multiplicador == 4.0
+    e.penalizar()  # no pasa del tope
+    assert e.multiplicador == 4.0
+
+
+def test_espera_adaptativa_recupera_hasta_uno():
+    e = EsperaAdaptativa(1.0, 2.0)
+    e.penalizar()
+    e.penalizar()
+    for _ in range(30):
+        e.recuperar()
+    assert e.multiplicador == 1.0
 
 
 # --- storage -------------------------------------------------------------

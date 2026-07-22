@@ -51,6 +51,35 @@ def espera_aleatoria(min_s: float, max_s: float) -> None:
     time.sleep(random.uniform(max(0.0, min_s), max(0.0, max_s)))
 
 
+class EsperaAdaptativa:
+    """Ajusta el tiempo de espera entre peticiones según cómo vaya el buscador.
+
+    Si detecta problemas (búsquedas vacías/bloqueos) sube el ritmo de espera;
+    cuando todo va bien lo baja poco a poco hacia el valor base. Así se es más
+    prudente solo cuando hace falta.
+    """
+
+    def __init__(self, base_min: float, base_max: float,
+                 factor: float = 1.5, maximo: float = 4.0) -> None:
+        self.base_min = max(0.0, base_min)
+        self.base_max = max(self.base_min, base_max)
+        self.factor = max(1.0, factor)
+        self.maximo = max(1.0, maximo)
+        self.multiplicador = 1.0
+
+    def penalizar(self) -> None:
+        """Sube el multiplicador (hasta el máximo) tras un problema."""
+        self.multiplicador = min(self.maximo, self.multiplicador * self.factor)
+
+    def recuperar(self) -> None:
+        """Baja el multiplicador poco a poco hacia 1.0 cuando todo va bien."""
+        self.multiplicador = max(1.0, self.multiplicador * 0.85)
+
+    def esperar(self) -> None:
+        espera_aleatoria(self.base_min * self.multiplicador,
+                         self.base_max * self.multiplicador)
+
+
 def dominio_resuelve(dom: str) -> bool:
     """Comprueba por DNS si un dominio existe (tiene dirección IP).
 

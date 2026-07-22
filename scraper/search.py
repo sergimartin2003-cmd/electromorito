@@ -91,6 +91,18 @@ def limpiar_y_dedup(urls: List[str]) -> List[str]:
     return salida
 
 
+def _ejecutar_motor(motor: str, page, consulta: str, config: Config) -> List[str]:
+    """Ejecuta un buscador concreto y devuelve sus URLs limpias y sin duplicados."""
+    funcion = _MOTORES.get(motor)
+    if funcion is None:
+        return []
+    try:
+        urls = funcion(page, consulta, config)
+    except Exception:
+        urls = []
+    return limpiar_y_dedup(urls)
+
+
 def buscar(page, consulta: str, config: Config) -> List[str]:
     """Devuelve URLs de resultados, probando los buscadores configurados en orden.
 
@@ -98,17 +110,50 @@ def buscar(page, consulta: str, config: Config) -> List[str]:
     Las URLs se limpian (sin parámetros de rastreo) y se deduplican.
     """
     for motor in config.motores:
-        funcion = _MOTORES.get(motor)
-        if funcion is None:
-            continue
-        try:
-            urls = funcion(page, consulta, config)
-        except Exception:
-            urls = []
-        urls = limpiar_y_dedup(urls)
+        urls = _ejecutar_motor(motor, page, consulta, config)
         if urls:
             return urls
     return []
+
+
+class GestorBuscadores:
+    """Gestiona varios buscadores rotando cuando el preferido falla de forma sostenida.
+
+    Cada búsqueda prueba los motores en el orden actual y usa el primero con
+    resultados. Si el motor preferido (el primero) falla `umbral_rotacion` veces
+    seguidas, pasa al final de la cola y otro toma su lugar. Así, si un buscador
+    empieza a bloquearte, el programa cambia solo al siguiente.
+    """
+
+    def __init__(self, motores: List[str], umbral_rotacion: int = 3) -> None:
+        self.motores = list(motores) or ["duckduckgo"]
+        self.umbral = max(1, umbral_rotacion)
+        self.fallos_preferido = 0
+        self.motor_usado = self.motores[0]
+        self.rotaciones = 0
+
+    def preferido(self) -> str:
+        return self.motores[0]
+
+    def buscar(self, page, consulta: str, config: Config) -> List[str]:
+        for pos, motor in enumerate(self.motores):
+            urls = _ejecutar_motor(motor, page, consulta, config)
+            if urls:
+                self.motor_usado = motor
+                if pos == 0:
+                    self.fallos_preferido = 0  # el preferido va bien
+                else:
+                    self._penalizar_preferido()  # otro tuvo que salvar la búsqueda
+                return urls
+        self._penalizar_preferido()  # nadie dio resultados
+        return []
+
+    def _penalizar_preferido(self) -> None:
+        self.fallos_preferido += 1
+        if self.fallos_preferido >= self.umbral and len(self.motores) > 1:
+            self.motores.append(self.motores.pop(0))  # rota el preferido al final
+            self.fallos_preferido = 0
+            self.rotaciones += 1
 
 
 def aviso_buscador(consecutivos_vacios: int) -> str | None:

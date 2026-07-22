@@ -7,9 +7,9 @@ from typing import Dict, List
 
 from .config import Config
 from .crawl import _USER_AGENT, analizar_web, robots_permite
-from .search import aviso_buscador, buscar
+from .search import GestorBuscadores, aviso_buscador
 from .storage import Almacen
-from .util import dominio_registrable, espera_aleatoria
+from .util import EsperaAdaptativa, dominio_registrable
 
 
 def _log(msg: str) -> None:
@@ -122,22 +122,34 @@ def ejecutar(config: Config) -> None:
 
         page = contexto.new_page()
 
+        gestor = GestorBuscadores(config.motores)
+        espera = EsperaAdaptativa(config.espera_min_segundos, config.espera_max_segundos)
         vacios_seguidos = 0
         try:
             for i, (categoria, provincia, consulta) in enumerate(consultas, start=1):
-                _log(f"[{i}/{len(consultas)}] Buscando: '{consulta}'")
+                preferido = gestor.preferido()
+                etiqueta_motor = f" [{preferido}]" if len(config.motores) > 1 else ""
+                _log(f"[{i}/{len(consultas)}]{etiqueta_motor} Buscando: '{consulta}'")
+                rotaciones_antes = gestor.rotaciones
                 try:
-                    urls = _filtrar_urls(buscar(page, consulta, config), config)
+                    urls = _filtrar_urls(gestor.buscar(page, consulta, config), config)
                 except Exception as e:  # noqa: BLE001
                     _log(f"    Error en la búsqueda: {e}")
                     urls = []
                 _log(f"    -> {len(urls)} webs candidatas")
 
+                # Espera adaptativa: sube el ritmo si va mal, lo baja si va bien
+                if config.espera_adaptativa:
+                    (espera.penalizar if not urls else espera.recuperar)()
+                if gestor.rotaciones > rotaciones_antes:
+                    _log(f"    ↻ Cambiando de buscador a '{gestor.preferido()}' (el anterior fallaba)")
+
                 # Detecta posible bloqueo del buscador (muchas búsquedas seguidas vacías)
                 vacios_seguidos = vacios_seguidos + 1 if not urls else 0
                 aviso = aviso_buscador(vacios_seguidos)
                 if aviso:
-                    _log(f"    ⚠ {aviso}")
+                    ritmo = f" (ritmo x{espera.multiplicador:.1f})" if espera.multiplicador > 1 else ""
+                    _log(f"    ⚠ {aviso}{ritmo}")
 
                 for url in urls:
                     dom = dominio_registrable(url)
@@ -173,7 +185,7 @@ def ejecutar(config: Config) -> None:
                             else:
                                 _log(f"    · {etiqueta[:50]} — sin datos de contacto")
 
-                    espera_aleatoria(config.espera_min_segundos, config.espera_max_segundos)
+                    espera.esperar()
 
         except KeyboardInterrupt:
             _log("\n  Interrumpido por el usuario. Guardando lo recogido hasta ahora…")

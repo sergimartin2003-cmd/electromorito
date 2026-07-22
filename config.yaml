@@ -84,6 +84,7 @@ timeout_segundos: 30             # tiempo máximo de espera al cargar una web
 # --- Buen comportamiento (no saturar los servidores) ------------------
 espera_min_segundos: 2.0         # pausa aleatoria mínima entre webs
 espera_max_segundos: 5.0         # pausa aleatoria máxima entre webs
+espera_adaptativa: true          # sube el ritmo de espera si el buscador limita, y lo baja al ir bien
 respetar_robots: true            # respeta el robots.txt de cada web (recomendado)
 
 # Dominios que NUNCA se rastrean (redes sociales, directorios, buscadores…)

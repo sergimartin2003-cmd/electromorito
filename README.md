@@ -72,6 +72,7 @@ Todo se controla desde **`config.yaml`** (está comentado en español). Lo más 
 | `navegador_visible` | `true` para ver el navegador; `false` para que vaya oculto y más rápido. |
 | `respetar_robots` | `true` = respeta el `robots.txt` de cada web (recomendado). |
 | `espera_min_segundos` / `espera_max_segundos` | Pausa entre webs para no saturar servidores. |
+| `espera_adaptativa` | `true` = sube el ritmo de espera si el buscador te limita. |
 | `palabras_relevancia` | Palabras del tema que se cuentan para puntuar cada web. |
 | `guardar_solo_relevantes` | `true` = descarta las webs con relevancia 0. |
 | `verificar_dominio` | `true` = comprueba por DNS que el dominio del correo existe (más lento). |
@@ -81,6 +82,12 @@ Todo se controla desde **`config.yaml`** (está comentado en español). Lo más 
 razonablemente; `startpage` y `google` son más frágiles (suelen pedir aceptar
 cookies o mostrar CAPTCHA). Con `auto` (o una lista) se prueban varios en orden y
 se usa el primero que dé resultados — útil si uno empieza a limitarte.
+
+**Resiliencia automática.** Con varios buscadores, si el preferido falla varias
+veces seguidas el programa **rota solo** al siguiente (verás `↻ Cambiando de
+buscador…`). Y con `espera_adaptativa: true`, cuando detecta que te están limitando
+**sube el ritmo de espera** para ser más prudente, y lo baja de nuevo cuando todo
+vuelve a ir bien. Así no tienes que estar vigilando la ejecución.
 
 Con las listas de ejemplo salen **240 búsquedas**. Empieza con pocas ciudades
 para probar y ve ampliando.

@@ -1,11 +1,17 @@
 """Tests de las funciones puras del motor de búsqueda."""
 
+from scraper import search
 from scraper.search import (
+    GestorBuscadores,
     _decodificar_ddg,
     limpiar_url,
     limpiar_y_dedup,
     pagina_bloqueada,
 )
+
+
+class _Cfg:
+    motores = ["a", "b"]
 
 
 # --- limpiar_url ---------------------------------------------------------
@@ -64,3 +70,34 @@ def test_ddg_enlace_directo():
 
 def test_ddg_none():
     assert _decodificar_ddg("") is None
+
+
+# --- GestorBuscadores (rotación) -----------------------------------------
+def test_gestor_usa_el_preferido(monkeypatch):
+    monkeypatch.setattr(search, "_MOTORES", {
+        "a": lambda p, q, c: ["https://a.es"],
+        "b": lambda p, q, c: ["https://b.es"],
+    })
+    g = GestorBuscadores(["a", "b"])
+    assert g.buscar(None, "q", _Cfg()) == ["https://a.es"]
+    assert g.preferido() == "a" and g.rotaciones == 0
+
+
+def test_gestor_rota_tras_fallos_sostenidos(monkeypatch):
+    monkeypatch.setattr(search, "_MOTORES", {
+        "a": lambda p, q, c: [],                 # siempre falla
+        "b": lambda p, q, c: ["https://b.es"],   # siempre funciona
+    })
+    g = GestorBuscadores(["a", "b"], umbral_rotacion=2)
+    g.buscar(None, "q", _Cfg())      # 'a' falla, 'b' salva -> 1 fallo del preferido
+    assert g.preferido() == "a"
+    g.buscar(None, "q", _Cfg())      # 2 fallos -> rota
+    assert g.preferido() == "b" and g.rotaciones == 1
+
+
+def test_gestor_no_rota_con_un_solo_motor(monkeypatch):
+    monkeypatch.setattr(search, "_MOTORES", {"a": lambda p, q, c: []})
+    g = GestorBuscadores(["a"], umbral_rotacion=1)
+    for _ in range(5):
+        g.buscar(None, "q", _Cfg())
+    assert g.preferido() == "a" and g.rotaciones == 0
