@@ -72,7 +72,7 @@ busquedas_extra: []
 
 # --- Cuánto rastrear --------------------------------------------------
 resultados_por_busqueda: 15      # cuántas webs coger de cada búsqueda
-paginas_por_busqueda: 1          # páginas de resultados (solo afecta a Bing)
+paginas_por_busqueda: 1          # páginas de resultados por búsqueda (DuckDuckGo y Bing)
 max_paginas_por_web: 4           # portada + páginas de contacto/aviso legal a visitar
 max_busquedas: 0                 # 0 = sin límite. Pon p.ej. 5 para una prueba rápida
 

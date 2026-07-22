@@ -7,25 +7,95 @@ En modo 'auto' o con una lista, se prueban en orden hasta obtener resultados.
 from __future__ import annotations
 
 from typing import List
-from urllib.parse import parse_qs, quote_plus, unquote, urlparse
+from urllib.parse import (
+    parse_qs,
+    parse_qsl,
+    quote_plus,
+    unquote,
+    urlencode,
+    urlparse,
+    urlunparse,
+)
 
 from .config import Config
+from .util import espera_aleatoria
+
+# Parámetros de URL que son solo de rastreo (se eliminan de los resultados)
+_PARAMS_RUIDO = {
+    "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
+    "utm_id", "fbclid", "gclid", "msclkid", "mc_cid", "mc_eid", "ref", "spm",
+    "igshid", "yclid", "_ga",
+}
+
+# Señales de que el buscador nos está bloqueando o pidiendo verificación
+_MARCAS_BLOQUEO = (
+    "unusual traffic", "detected unusual", "are you a robot", "captcha",
+    "recaptcha", "if this error persists", "anomaly", "verify you are human",
+    "verifica que eres humano", "tráfico inusual", "trafico inusual",
+    "too many requests", "forbidden",
+)
 
 
 def _abrir(page, url: str, config: Config) -> bool:
     """Navega a `url`. Devuelve True si cargó, False si falló."""
     try:
         page.goto(url, timeout=config.timeout_segundos * 1000, wait_until="domcontentloaded")
-        page.wait_for_timeout(1000)
+        page.wait_for_timeout(800)
         return True
     except Exception:
         return False
+
+
+def _contenido(page) -> str:
+    """Texto/HTML de la página para detectar bloqueos (mejor esfuerzo)."""
+    try:
+        return page.content()
+    except Exception:
+        return ""
+
+
+def pagina_bloqueada(texto: str) -> bool:
+    """True si el contenido parece una página de bloqueo/CAPTCHA del buscador."""
+    t = (texto or "").lower()
+    return any(m in t for m in _MARCAS_BLOQUEO)
+
+
+def limpiar_url(url: str) -> str:
+    """Normaliza una URL de resultado: quita el fragmento y los parámetros de rastreo."""
+    if not url or not url.startswith(("http://", "https://")):
+        return ""
+    try:
+        p = urlparse(url)
+    except Exception:
+        return ""
+    if not p.netloc:
+        return ""
+    query = ""
+    if p.query:
+        params = [(k, v) for k, v in parse_qsl(p.query, keep_blank_values=True)
+                  if k.lower() not in _PARAMS_RUIDO]
+        query = urlencode(params)
+    return urlunparse((p.scheme, p.netloc, p.path, "", query, ""))
+
+
+def limpiar_y_dedup(urls: List[str]) -> List[str]:
+    """Limpia cada URL y elimina duplicados conservando el orden."""
+    vistas = set()
+    salida: List[str] = []
+    for u in urls:
+        limpia = limpiar_url(u)
+        if not limpia or limpia in vistas:
+            continue
+        vistas.add(limpia)
+        salida.append(limpia)
+    return salida
 
 
 def buscar(page, consulta: str, config: Config) -> List[str]:
     """Devuelve URLs de resultados, probando los buscadores configurados en orden.
 
     En modo 'auto' (varios motores) usa el primero que devuelva resultados.
+    Las URLs se limpian (sin parámetros de rastreo) y se deduplican.
     """
     for motor in config.motores:
         funcion = _MOTORES.get(motor)
@@ -35,6 +105,7 @@ def buscar(page, consulta: str, config: Config) -> List[str]:
             urls = funcion(page, consulta, config)
         except Exception:
             urls = []
+        urls = limpiar_y_dedup(urls)
         if urls:
             return urls
     return []
@@ -111,35 +182,73 @@ def _decodificar_ddg(href: str) -> str | None:
     return href if href.startswith("http") else None
 
 
-def _buscar_duckduckgo(page, consulta: str, config: Config) -> List[str]:
-    url = (
-        "https://html.duckduckgo.com/html/?q="
-        + quote_plus(consulta)
-        + f"&kl={config.idioma_region}"
-    )
+def _href_attrs(page, selector: str) -> List[str]:
+    """Devuelve los atributos href (crudos) de un selector, o []."""
+    try:
+        return page.eval_on_selector_all(
+            selector, "els => els.map(e => e.getAttribute('href'))"
+        ) or []
+    except Exception:
+        return []
+
+
+def _ddg_click_siguiente(page) -> bool:
+    """Pulsa el botón 'Siguiente' de DuckDuckGo (html/lite). True si pudo."""
+    for selector in (
+        ".nav-link input[type=submit]",
+        "input.btn--alt[type=submit]",
+        "input[type=submit][value='Next']",
+        "input[type=submit][value*='iguiente']",
+        "form.nav-link input[type=submit]",
+    ):
+        try:
+            botones = page.query_selector_all(selector)
+            if botones:
+                botones[-1].click(timeout=3000)
+                page.wait_for_timeout(900)
+                return True
+        except Exception:
+            continue
+    return False
+
+
+def _ddg_recoger(page, selector: str, config: Config) -> List[str]:
+    """Recoge resultados de DuckDuckGo paginando hasta `paginas_por_busqueda`."""
+    urls: List[str] = []
+    paginas = max(1, config.paginas_por_busqueda)
+    for i in range(paginas):
+        for href in _href_attrs(page, selector):
+            real = _decodificar_ddg(href)
+            if real:
+                urls.append(real)
+        if i < paginas - 1 and not _ddg_click_siguiente(page):
+            break
+    return urls
+
+
+def _ddg_endpoint(page, base: str, selector: str, consulta: str, config: Config) -> List[str]:
+    url = base + "?q=" + quote_plus(consulta) + f"&kl={config.idioma_region}"
     if not _abrir(page, url, config):
         return []
-    try:
-        hrefs = page.eval_on_selector_all(
-            "a.result__a", "els => els.map(e => e.getAttribute('href'))"
-        )
-    except Exception:
-        hrefs = []
-    # Respaldo por si cambia el marcado: cualquier enlace con el redirect 'uddg='
-    if not hrefs:
-        try:
-            hrefs = page.eval_on_selector_all(
-                "a[href*='uddg=']", "els => els.map(e => e.getAttribute('href'))"
-            )
-        except Exception:
-            hrefs = []
+    if pagina_bloqueada(_contenido(page)):
+        return []
+    return _ddg_recoger(page, selector, config)
 
-    urls: List[str] = []
-    for href in hrefs:
-        real = _decodificar_ddg(href)
-        if real:
-            urls.append(real)
-    return urls
+
+def _buscar_duckduckgo(page, consulta: str, config: Config) -> List[str]:
+    """DuckDuckGo con paginación; si el endpoint HTML falla o bloquea, prueba Lite."""
+    urls = _ddg_endpoint(
+        page, "https://html.duckduckgo.com/html/",
+        "a.result__a, a[href*='uddg=']", consulta, config,
+    )
+    if urls:
+        return urls
+    # Reintento con espera algo mayor sobre el endpoint 'lite' (más simple y tolerante)
+    espera_aleatoria(config.espera_min_segundos, config.espera_max_segundos * 1.5)
+    return _ddg_endpoint(
+        page, "https://lite.duckduckgo.com/lite/",
+        "a.result-link, a[href*='uddg=']", consulta, config,
+    )
 
 
 # --- Bing ----------------------------------------------------------------
@@ -154,21 +263,14 @@ def _buscar_bing(page, consulta: str, config: Config) -> List[str]:
             + f"&first={first}&setlang=es&cc=ES"
         )
         if not _abrir(page, url, config):
-            continue
-        try:
-            hrefs = page.eval_on_selector_all(
-                "li.b_algo h2 a", "els => els.map(e => e.href)"
-            )
-        except Exception:
-            hrefs = []
+            break
+        _aceptar_consentimiento(page)
+        if pagina_bloqueada(_contenido(page)):
+            break
+        hrefs = _hrefs(page, "li.b_algo h2 a", "#b_results h2 a", "#b_results li.b_algo a[href^='http']")
         if not hrefs:
-            try:
-                hrefs = page.eval_on_selector_all(
-                    "#b_results h2 a", "els => els.map(e => e.href)"
-                )
-            except Exception:
-                hrefs = []
-        urls.extend(h for h in hrefs if h and h.startswith("http"))
+            break  # sin resultados: no tiene sentido seguir paginando
+        urls.extend(hrefs)
     return urls
 
 
@@ -176,6 +278,8 @@ def _buscar_bing(page, consulta: str, config: Config) -> List[str]:
 def _buscar_mojeek(page, consulta: str, config: Config) -> List[str]:
     url = "https://www.mojeek.com/search?q=" + quote_plus(consulta)
     if not _abrir(page, url, config):
+        return []
+    if pagina_bloqueada(_contenido(page)):
         return []
     hrefs = _hrefs(page, "a.title", "ul.results-standard li a[href^='http']",
                    ".results a[href^='http']")
@@ -188,6 +292,8 @@ def _buscar_startpage(page, consulta: str, config: Config) -> List[str]:
     if not _abrir(page, url, config):
         return []
     _aceptar_consentimiento(page)
+    if pagina_bloqueada(_contenido(page)):
+        return []
     hrefs = _hrefs(page, "a.result-link", "a.w-gl__result-title",
                    ".w-gl__result a[href^='http']", ".result a[href^='http']")
     return [h for h in hrefs if "startpage.com" not in h]
@@ -199,10 +305,12 @@ def _buscar_google(page, consulta: str, config: Config) -> List[str]:
     if not _abrir(page, url, config):
         return []
     _aceptar_consentimiento(page)
+    if pagina_bloqueada(_contenido(page)):
+        return []
     hrefs = _hrefs(page, "div.yuRUbf > a", "#search a[href^='http']",
                    "#rso a[href^='http']")
     malos = ("google.com", "google.es", "gstatic.com", "googleusercontent.com",
-             "youtube.com", "webcache.googleusercontent.com")
+             "youtube.com", "webcache.googleusercontent.com", "accounts.google")
     return [h for h in hrefs if not any(m in h for m in malos)]
 
 

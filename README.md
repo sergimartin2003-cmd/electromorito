@@ -168,11 +168,15 @@ python run.py --informe
 - **"playwright: command not found" / no encuentra el navegador** → ejecuta
   `pip install -r requirements.txt` y luego `playwright install chromium`.
 - **Pocos resultados o el buscador te bloquea** → sube `espera_min_segundos` y
-  `espera_max_segundos`, reduce `resultados_por_busqueda`, o cambia
-  `motor_busqueda` a `bing`. No lo lances de forma agresiva.
+  `espera_max_segundos`, reduce `resultados_por_busqueda`, o pon
+  `motor_busqueda: auto` (prueba varios buscadores). No lo lances de forma agresiva.
+  El programa **detecta el bloqueo/CAPTCHA** y, en DuckDuckGo, reintenta por su
+  versión *lite* antes de rendirse.
 - **Va lento** → pon `navegador_visible: false` y deja `bloquear_recursos: true`.
-- **Quieres más resultados por búsqueda** → con `bing` puedes subir
-  `paginas_por_busqueda`.
+- **Quieres más resultados por búsqueda** → sube `paginas_por_busqueda` (ahora
+  funciona tanto en DuckDuckGo como en Bing).
+- El detector de teléfonos es **conservador** a propósito (exige `+34` o
+  separadores) para evitar falsos positivos; prioriza siempre los enlaces `tel:`.
 - El detector de teléfonos es **conservador** a propósito (exige `+34` o
   separadores) para evitar falsos positivos; prioriza siempre los enlaces `tel:`.
 
