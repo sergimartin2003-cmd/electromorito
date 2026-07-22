@@ -116,6 +116,7 @@ Opciones disponibles:
 | `--solo-relevantes` | Guarda solo webs con alguna palabra del tema (relevancia > 0). |
 | `--salida NOMBRE` / `-o` | Nombre base de los ficheros de salida. |
 | `--informe` | No rastrea: solo regenera el panel HTML desde el CSV. |
+| `--contactos` | No rastrea: genera la lista depurada de contactos desde el CSV. |
 | `-c ARCHIVO` | Usa otro archivo de configuración. |
 
 - Puedes **detenerlo en cualquier momento** con `Ctrl + C`: lo ya recogido queda
@@ -167,6 +168,17 @@ python run.py --informe
 
 > Consejo: para una lista de contacto en frío, filtra `tipo_correo = genérico` y
 > ordena por `relevancia` de mayor a menor.
+
+### Lista depurada para envío (`resultados_contactos.csv`)
+
+Además, se genera **`resultados_contactos.csv`**: **una fila por organización**
+(no por correo), eligiendo el **mejor correo** de cada una (prioriza los buzones
+genéricos tipo `info@`) y juntando el resto en `todos_los_correos`. Está **ordenada
+por relevancia** de mayor a menor, así que es la lista más práctica para empezar a
+contactar. Columnas: `nombre`, `correo_principal`, `todos_los_correos`, `telefonos`,
+`provincia`, `web`, `relevancia`.
+
+Para regenerarla desde un CSV ya existente: `python run.py --contactos`.
 
 ---
 
@@ -243,10 +255,11 @@ electromorito/
 │   ├── config.py        # carga config.yaml y genera las búsquedas
 │   ├── search.py        # busca en DuckDuckGo / Bing
 │   ├── crawl.py         # visita webs y páginas de contacto
-│   ├── extract.py       # extrae correos, teléfonos, CP, redes, clasifica y puntúa
+│   ├── extract.py       # extrae correos, teléfonos, CP, redes, nombre, clasifica y puntúa
 │   ├── storage.py       # guarda CSV + Excel, deduplica, migra y reanuda
 │   ├── report.py        # genera el panel HTML navegable
+│   ├── contactos.py     # lista depurada (una fila por organización) para envío
 │   ├── runner.py        # orquesta todo el proceso
-│   └── util.py          # utilidades (dominios, pausas)
+│   └── util.py          # utilidades (dominios, pausas, DNS, espera adaptativa)
 └── tests/               # tests automáticos (pytest)
 ```

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+import json
 import re
 import unicodedata
 from typing import Iterable, List, Optional
@@ -181,6 +182,57 @@ def limpiar_nombre(titulo: Optional[str]) -> str:
     # Elimina coletillas típicas al final
     nombre = re.sub(r"\s*[-|]?\s*(inicio|home|bienvenidos?|welcome)\s*$", "", nombre, flags=re.I)
     return nombre.strip()[:150]
+
+
+_JSONLD_RE = re.compile(
+    r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
+    re.I | re.S,
+)
+# Tipos de schema.org que representan una organización
+_TIPOS_ORG = (
+    "organization", "ngo", "localbusiness", "educationalorganization",
+    "nonprofit", "nonprofitorganization", "corporation", "school",
+    "collegeoruniversity", "governmentorganization",
+)
+
+
+def _nombre_org_en(obj) -> Optional[str]:
+    """Busca recursivamente el 'name' de una organización dentro de datos JSON-LD."""
+    if isinstance(obj, dict):
+        tipos = obj.get("@type", "")
+        tipos = tipos if isinstance(tipos, list) else [tipos]
+        if any(str(t).lower() in _TIPOS_ORG for t in tipos):
+            nombre = obj.get("name")
+            if isinstance(nombre, str) and nombre.strip():
+                return nombre.strip()
+        for valor in obj.values():
+            encontrado = _nombre_org_en(valor)
+            if encontrado:
+                return encontrado
+    elif isinstance(obj, list):
+        for elemento in obj:
+            encontrado = _nombre_org_en(elemento)
+            if encontrado:
+                return encontrado
+    return None
+
+
+def nombre_estructurado(html_texto: str) -> str:
+    """Extrae el nombre de la organización de los datos JSON-LD (schema.org), o ''."""
+    if not html_texto:
+        return ""
+    for bloque in _JSONLD_RE.findall(html_texto):
+        bloque = bloque.strip()
+        if not bloque:
+            continue
+        try:
+            datos = json.loads(bloque)
+        except Exception:
+            continue
+        nombre = _nombre_org_en(datos)
+        if nombre:
+            return " ".join(nombre.split())[:150]
+    return ""
 
 
 def clave_organizacion(nombre: str) -> str:

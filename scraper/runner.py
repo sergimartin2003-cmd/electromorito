@@ -210,6 +210,14 @@ def ejecutar(config: Config) -> None:
             _log(f"       Informe HTML:               {ruta_html}")
     except Exception as e:  # noqa: BLE001
         _log(f"       (No se pudo generar el informe HTML: {e})")
+    try:
+        from .contactos import exportar_contactos
+        ruta_contactos = config.archivo_salida + "_contactos.csv"
+        n = exportar_contactos(almacen.filas, ruta_contactos)
+        if n:
+            _log(f"       Lista de contactos ({n}):     {ruta_contactos}")
+    except Exception as e:  # noqa: BLE001
+        _log(f"       (No se pudo generar la lista de contactos: {e})")
     _resumen(almacen)
     _log("=" * 64)
 

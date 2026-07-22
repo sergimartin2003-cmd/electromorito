@@ -16,6 +16,7 @@ from .extract import (
     extraer_redes,
     extraer_telefonos,
     limpiar_nombre,
+    nombre_estructurado,
 )
 from .util import dominio, dominio_registrable, dominio_resuelve, espera_aleatoria
 
@@ -139,6 +140,14 @@ def _tels_href(page) -> List[str]:
 
 
 def _nombre(page) -> str:
+    # 1) Datos estructurados (schema.org / JSON-LD): suelen tener el nombre oficial
+    try:
+        estructurado = nombre_estructurado(page.content())
+        if estructurado:
+            return estructurado
+    except Exception:
+        pass
+    # 2) Meta og:site_name
     try:
         el = page.query_selector("meta[property='og:site_name']")
         if el:
@@ -147,6 +156,7 @@ def _nombre(page) -> str:
                 return valor.strip()[:150]
     except Exception:
         pass
+    # 3) Título de la página
     try:
         return limpiar_nombre(page.title())
     except Exception:

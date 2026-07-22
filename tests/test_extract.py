@@ -9,6 +9,7 @@ from scraper.extract import (
     extraer_redes,
     extraer_telefonos,
     limpiar_nombre,
+    nombre_estructurado,
 )
 
 PALABRAS = ["discapacidad", "educación especial", "fundación", "IFE", "PFI", "inclusión"]
@@ -182,3 +183,22 @@ def test_clave_no_fusiona_distintas():
 
 def test_clave_vacia():
     assert clave_organizacion("") == ""
+
+
+# --- Nombre estructurado (JSON-LD / schema.org) --------------------------
+def test_nombre_jsonld_organizacion():
+    html = ('<script type="application/ld+json">'
+            '{"@type":"NGO","name":"Fundación Real"}</script>')
+    assert nombre_estructurado(html) == "Fundación Real"
+
+
+def test_nombre_jsonld_graph():
+    html = ('<script type="application/ld+json">'
+            '{"@graph":[{"@type":"WebSite","name":"web"},'
+            '{"@type":"EducationalOrganization","name":"Escuela X"}]}</script>')
+    assert nombre_estructurado(html) == "Escuela X"
+
+
+def test_nombre_jsonld_ausente_o_invalido():
+    assert nombre_estructurado("<p>hola</p>") == ""
+    assert nombre_estructurado('<script type="application/ld+json">{no es json}</script>') == ""

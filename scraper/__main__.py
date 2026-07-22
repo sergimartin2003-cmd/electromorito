@@ -40,6 +40,10 @@ def main() -> None:
         help="No rastrea: solo regenera el informe HTML a partir del CSV ya existente.",
     )
     parser.add_argument(
+        "--contactos", action="store_true",
+        help="No rastrea: genera la lista depurada de contactos desde el CSV existente.",
+    )
+    parser.add_argument(
         "--reiniciar", action="store_true",
         help="Borra los resultados previos y empieza de cero (no reanuda).",
     )
@@ -71,6 +75,16 @@ def main() -> None:
             print(f"Informe HTML generado: {ruta}")
         else:
             print(f"No existe {config.archivo_salida}.csv. Ejecuta primero el scraper.")
+        return
+
+    if args.contactos:
+        from .contactos import exportar_contactos
+        salida = config.archivo_salida + "_contactos.csv"
+        n = exportar_contactos(config.archivo_salida + ".csv", salida)
+        if n is None:
+            print(f"No existe {config.archivo_salida}.csv. Ejecuta primero el scraper.")
+        else:
+            print(f"Lista de contactos generada ({n} organizaciones): {salida}")
         return
 
     if args.reiniciar:
