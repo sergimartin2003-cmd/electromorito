@@ -101,22 +101,40 @@ python run.py -c mi_config.yaml
 
 ### Resultado
 
-Se generan dos ficheros con estas columnas:
+Se generan **tres** ficheros: `resultados.csv`, `resultados.xlsx` y
+`resultados.html` (un panel navegable, ver más abajo). Columnas:
 
-`nombre` · `correo` · `tipo_correo` · `telefonos` · `provincia` · `categoria` ·
-`relevancia` · `web` · `dominio` · `busqueda` · `fecha`
+`nombre` · `correo` · `tipo_correo` · `telefonos` · `provincia` · `codigo_postal` ·
+`categoria` · `relevancia` · `web` · `redes` · `dominio` · `busqueda` · `fecha`
 
 - **`tipo_correo`**: `genérico` (buzón tipo `info@`, ideal para contacto), `personal`
   (parece `nombre.apellido@`), `gratuito` (gmail, hotmail…) u `otro`.
-- **`provincia`**: la ciudad/provincia de la búsqueda que encontró la web.
+- **`provincia`** / **`codigo_postal`**: zona de la organización (el CP se detecta
+  del texto de la web cuando aparece).
 - **`relevancia`**: cuántas palabras del tema (discapacidad, PFI, IFE, inclusión…)
   aparecen en la web. **Cuanto más alto, más probable es que encaje**; un `0` suele
   ser un resultado que no va del tema.
+- **`redes`**: enlaces a perfiles de redes sociales (Facebook, Instagram, LinkedIn…),
+  útiles como vía de contacto alternativa.
 
 Hay **una fila por cada correo** encontrado (los correos no se repiten en todo el
 fichero). El `.xlsx` es cómodo para abrir en Excel/LibreOffice y **ordenar por
 `relevancia` o filtrar por `tipo_correo`**. Al terminar, el programa imprime un
 resumen con el reparto de correos por tipo y por provincia.
+
+### Panel HTML
+
+Se genera también **`resultados.html`**: ábrelo con doble clic en tu navegador.
+Permite **buscar, filtrar** (por tipo de correo, provincia y relevancia mínima),
+**ordenar** por cualquier columna y **copiar de golpe todos los correos filtrados**
+al portapapeles (botón «Copiar correos»). Los correos son enlaces `mailto:` y las
+webs y redes se abren en una pestaña nueva.
+
+Para regenerar solo el panel a partir de un CSV ya existente (sin volver a rastrear):
+
+```bash
+python run.py --informe
+```
 
 > Consejo: para una lista de contacto en frío, filtra `tipo_correo = genérico` y
 > ordena por `relevancia` de mayor a menor.
@@ -192,8 +210,9 @@ electromorito/
 │   ├── config.py        # carga config.yaml y genera las búsquedas
 │   ├── search.py        # busca en DuckDuckGo / Bing
 │   ├── crawl.py         # visita webs y páginas de contacto
-│   ├── extract.py       # extrae correos, teléfonos, clasifica y puntúa
+│   ├── extract.py       # extrae correos, teléfonos, CP, redes, clasifica y puntúa
 │   ├── storage.py       # guarda CSV + Excel, deduplica, migra y reanuda
+│   ├── report.py        # genera el panel HTML navegable
 │   ├── runner.py        # orquesta todo el proceso
 │   └── util.py          # utilidades (dominios, pausas)
 └── tests/               # tests automáticos (pytest)

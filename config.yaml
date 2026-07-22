@@ -125,7 +125,7 @@ palabras_relevancia:
 guardar_solo_relevantes: false
 
 # --- Salida -----------------------------------------------------------
-# Se generan  <archivo_salida>.csv  y  <archivo_salida>.xlsx
-# Columnas: nombre, correo, tipo_correo, telefonos, provincia, categoria,
-#           relevancia, web, dominio, busqueda, fecha
+# Se generan  <archivo_salida>.csv, .xlsx  y  .html  (panel navegable)
+# Columnas: nombre, correo, tipo_correo, telefonos, provincia, codigo_postal,
+#           categoria, relevancia, web, redes, dominio, busqueda, fecha
 archivo_salida: resultados

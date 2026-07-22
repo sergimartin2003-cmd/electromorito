@@ -35,6 +35,10 @@ def main() -> None:
         "--prueba", action="store_true",
         help="Modo prueba: limita a 3 búsquedas para comprobar que todo funciona.",
     )
+    parser.add_argument(
+        "--informe", action="store_true",
+        help="No rastrea: solo regenera el informe HTML a partir del CSV ya existente.",
+    )
     args = parser.parse_args()
 
     try:
@@ -42,6 +46,15 @@ def main() -> None:
     except (FileNotFoundError, ValueError) as e:
         print(f"ERROR de configuración: {e}")
         sys.exit(1)
+
+    if args.informe:
+        from .report import generar_informe
+        ruta = generar_informe(config.archivo_salida + ".csv")
+        if ruta:
+            print(f"Informe HTML generado: {ruta}")
+        else:
+            print(f"No existe {config.archivo_salida}.csv. Ejecuta primero el scraper.")
+        return
 
     if args.prueba:
         config.max_busquedas = 3

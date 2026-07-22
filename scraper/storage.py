@@ -15,8 +15,8 @@ from typing import Dict, List, Set
 from .extract import clasificar_correo
 
 CAMPOS = [
-    "nombre", "correo", "tipo_correo", "telefonos", "provincia",
-    "categoria", "relevancia", "web", "dominio", "busqueda", "fecha",
+    "nombre", "correo", "tipo_correo", "telefonos", "provincia", "codigo_postal",
+    "categoria", "relevancia", "web", "redes", "dominio", "busqueda", "fecha",
 ]
 
 
@@ -117,8 +117,10 @@ class Almacen:
             "nombre": org.get("nombre", ""),
             "telefonos": telefonos,
             "provincia": org.get("provincia", ""),
+            "codigo_postal": org.get("codigo_postal", ""),
             "categoria": org.get("categoria", ""),
             "relevancia": str(org.get("relevancia", "")),
+            "redes": "; ".join(org.get("redes") or []),
             "web": org.get("web", ""),
             "dominio": dom,
             "busqueda": org.get("busqueda", ""),

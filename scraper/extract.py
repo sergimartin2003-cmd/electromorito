@@ -227,3 +227,59 @@ def calcular_relevancia(texto: str, palabras: Iterable[str]) -> int:
         if palabra and palabra in t:
             encontradas += 1
     return encontradas
+
+
+# --- Código postal (España) ---------------------------------------------
+# 5 dígitos cuyos dos primeros son un código de provincia válido (01–52).
+_CP_RE = re.compile(r"(?<!\d)(0[1-9]|[1-4]\d|5[0-2])(\d{3})(?!\d)")
+# Igual, pero precedido de "C.P.", "CP" o "código postal" (más fiable).
+_CP_CONTEXTO_RE = re.compile(
+    r"(?:c\.?\s?p\.?|c[oó]digo\s+postal)\D{0,8}((?:0[1-9]|[1-4]\d|5[0-2])\d{3})",
+    re.I,
+)
+
+
+def extraer_codigo_postal(texto: str) -> str:
+    """Devuelve el primer código postal español plausible, o '' si no hay."""
+    if not texto:
+        return ""
+    m = _CP_CONTEXTO_RE.search(texto)
+    if m:
+        return m.group(1)
+    m = _CP_RE.search(texto)
+    if m:
+        return m.group(1) + m.group(2)
+    return ""
+
+
+# --- Redes sociales ------------------------------------------------------
+_REDES_DOMINIOS = (
+    "facebook.com", "instagram.com", "linkedin.com", "twitter.com",
+    "x.com", "youtube.com", "t.me", "wa.me",
+)
+# Enlaces que NO son un perfil (botones de compartir, login, plugins…)
+_REDES_EXCLUIR = (
+    "sharer", "share.php", "/share", "intent/", "/plugins/", "dialog/",
+    "/login", "/sharer.php", "oauth",
+)
+_URL_RE = re.compile(r"https?://[^\s\"'<>)]+")
+
+
+def extraer_redes(html_texto: str) -> List[str]:
+    """Devuelve un enlace de perfil por cada red social encontrada (sin botones de compartir)."""
+    if not html_texto:
+        return []
+    encontrados: dict = {}
+    for url in _URL_RE.findall(html_texto):
+        low = url.lower()
+        limpio = low.split("?")[0].rstrip("/")
+        for dom in _REDES_DOMINIOS:
+            if dom in limpio:
+                if any(x in low for x in _REDES_EXCLUIR):
+                    break
+                # El perfil real tiene algo después del dominio (facebook.com/nombre)
+                resto = limpio.split(dom, 1)[1].strip("/")
+                if resto:
+                    encontrados.setdefault(dom, url.split("?")[0].rstrip("/"))
+                break
+    return list(encontrados.values())

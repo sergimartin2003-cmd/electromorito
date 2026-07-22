@@ -184,6 +184,13 @@ def ejecutar(config: Config) -> None:
     if almacen.exportar_excel():
         _log(f"       Excel generado:             {almacen.ruta_xlsx}")
     _log(f"       CSV:                        {almacen.ruta_csv}")
+    try:
+        from .report import generar_informe
+        ruta_html = generar_informe(almacen.ruta_csv)
+        if ruta_html:
+            _log(f"       Informe HTML:               {ruta_html}")
+    except Exception as e:  # noqa: BLE001
+        _log(f"       (No se pudo generar el informe HTML: {e})")
     _resumen(almacen)
     _log("=" * 64)
 

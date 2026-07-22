@@ -8,7 +8,14 @@ import urllib.robotparser
 from typing import Dict, List, Optional
 
 from .config import Config
-from .extract import calcular_relevancia, extraer_correos, extraer_telefonos, limpiar_nombre
+from .extract import (
+    calcular_relevancia,
+    extraer_codigo_postal,
+    extraer_correos,
+    extraer_redes,
+    extraer_telefonos,
+    limpiar_nombre,
+)
 from .util import dominio, dominio_registrable, espera_aleatoria
 
 # Palabras que sugieren que un enlace lleva a información de contacto/legal
@@ -197,13 +204,17 @@ def analizar_web(
     correos = extraer_correos(texto, mailtos)
     telefonos = extraer_telefonos(texto, tels_href)
     relevancia = calcular_relevancia(texto, config.palabras_relevancia)
+    codigo_postal = extraer_codigo_postal(texto)
+    redes = extraer_redes(texto)
 
     return {
         "nombre": nombre,
         "correos": correos,
         "telefonos": telefonos,
         "provincia": provincia,
+        "codigo_postal": codigo_postal,
         "relevancia": relevancia,
+        "redes": redes,
         "web": web_final,
         "dominio": dominio_registrable(web_final),
         "categoria": categoria,

@@ -3,7 +3,9 @@
 from scraper.extract import (
     calcular_relevancia,
     clasificar_correo,
+    extraer_codigo_postal,
     extraer_correos,
+    extraer_redes,
     extraer_telefonos,
     limpiar_nombre,
 )
@@ -113,3 +115,45 @@ def test_relevancia_cero_si_no_hay_tema():
 
 def test_relevancia_sin_palabras():
     assert calcular_relevancia("cualquier cosa", []) == 0
+
+
+# --- Código postal -------------------------------------------------------
+def test_cp_con_contexto():
+    assert extraer_codigo_postal("C/ Mayor 3, C.P. 28013 Madrid") == "28013"
+
+
+def test_cp_sin_contexto():
+    assert extraer_codigo_postal("Calle Falsa 08001 Barcelona") == "08001"
+
+
+def test_cp_rango_invalido():
+    # 99xxx no es una provincia española válida
+    assert extraer_codigo_postal("referencia 99123 del pedido") == ""
+
+
+def test_cp_no_confunde_telefono():
+    assert extraer_codigo_postal("Tel 911223344") == ""
+
+
+# --- Redes sociales ------------------------------------------------------
+def test_redes_un_enlace_por_plataforma():
+    html_txt = '''
+      <a href="https://facebook.com/fundacion">fb</a>
+      <a href="https://www.instagram.com/fundacion/">ig</a>
+      <a href="https://facebook.com/fundacion/photos">fb2</a>
+    '''
+    redes = extraer_redes(html_txt)
+    assert any("facebook.com/fundacion" in r for r in redes)
+    assert any("instagram.com/fundacion" in r for r in redes)
+    # facebook aparece una sola vez
+    assert sum("facebook.com" in r for r in redes) == 1
+
+
+def test_redes_ignora_botones_de_compartir():
+    html_txt = '<a href="https://www.facebook.com/sharer/sharer.php?u=x">compartir</a>'
+    assert extraer_redes(html_txt) == []
+
+
+def test_redes_ignora_dominio_sin_perfil():
+    html_txt = '<a href="https://facebook.com/">facebook</a>'
+    assert extraer_redes(html_txt) == []
