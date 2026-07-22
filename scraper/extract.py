@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import html
 import re
+import unicodedata
 from typing import Iterable, List, Optional
 
 # --- Correos electrónicos ------------------------------------------------
@@ -180,6 +181,22 @@ def limpiar_nombre(titulo: Optional[str]) -> str:
     # Elimina coletillas típicas al final
     nombre = re.sub(r"\s*[-|]?\s*(inicio|home|bienvenidos?|welcome)\s*$", "", nombre, flags=re.I)
     return nombre.strip()[:150]
+
+
+def clave_organizacion(nombre: str) -> str:
+    """Normaliza el nombre para agrupar la misma organización (sin tildes ni signos).
+
+    Ej.: 'Fundación Ejemplo, S.L.' y 'FUNDACION  EJEMPLO SL' -> 'fundacion ejemplo sl'.
+    Es conservador: solo coinciden nombres realmente iguales.
+    """
+    if not nombre:
+        return ""
+    t = unicodedata.normalize("NFKD", nombre).encode("ascii", "ignore").decode("ascii")
+    t = re.sub(r"[^a-z0-9 ]", " ", t.lower())
+    t = " ".join(t.split())
+    # Quita la forma jurídica al final (S.L., SL, S.A., SLU…) para que coincidan variantes
+    t = re.sub(r"\s+(s\s*l\s*u?|s\s*a\s*l?|s\s*l\s*l|s\s*coop|scp|aie|ute)\s*$", "", t)
+    return t.strip()
 
 
 # --- Clasificación de correos -------------------------------------------

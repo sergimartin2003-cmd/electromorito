@@ -3,6 +3,7 @@
 from scraper.extract import (
     calcular_relevancia,
     clasificar_correo,
+    clave_organizacion,
     extraer_codigo_postal,
     extraer_correos,
     extraer_redes,
@@ -162,3 +163,22 @@ def test_redes_ignora_botones_de_compartir():
 def test_redes_ignora_dominio_sin_perfil():
     html_txt = '<a href="https://facebook.com/">facebook</a>'
     assert extraer_redes(html_txt) == []
+
+
+# --- Clave de organización (agrupar duplicados) --------------------------
+def test_clave_ignora_tildes_puntuacion_y_forma_juridica():
+    a = clave_organizacion("Fundación Ejemplo, S.L.")
+    b = clave_organizacion("FUNDACION  EJEMPLO SL")
+    assert a == b == "fundacion ejemplo"
+
+
+def test_clave_slu():
+    assert clave_organizacion("Centro IFE, S.L.U.") == clave_organizacion("Centro IFE SLU")
+
+
+def test_clave_no_fusiona_distintas():
+    assert clave_organizacion("Fundación Ana") != clave_organizacion("Fundación Ander")
+
+
+def test_clave_vacia():
+    assert clave_organizacion("") == ""

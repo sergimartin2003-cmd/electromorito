@@ -224,3 +224,15 @@ def _resumen(almacen) -> None:
         _log("    Por provincia (top 10):")
         for clave, n in provincias[:10]:
             _log(f"      - {clave:22} {n}")
+
+    # Posibles organizaciones duplicadas: mismo 'grupo' con más de un dominio.
+    dominios_por_grupo: Dict[str, set] = {}
+    for f in filas:
+        grupo = (f.get("grupo") or "").strip()
+        if grupo:
+            dominios_por_grupo.setdefault(grupo, set()).add((f.get("dominio") or "").strip())
+    duplicados = {g: d for g, d in dominios_por_grupo.items() if len(d) > 1}
+    if duplicados:
+        _log(f"    Posibles organizaciones duplicadas (mismo nombre, varias webs): {len(duplicados)}")
+        for grupo, doms in list(duplicados.items())[:5]:
+            _log(f"      - {grupo[:40]:40} {', '.join(sorted(doms))[:60]}")

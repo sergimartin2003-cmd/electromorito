@@ -62,6 +62,32 @@ def test_motor_invalido(tmp_path):
         Config.cargar(ruta)
 
 
+def test_motor_unico(tmp_path):
+    ruta = _escribir(tmp_path, """
+        categorias: ["x"]
+        motor_busqueda: "bing"
+    """)
+    assert Config.cargar(ruta).motores == ["bing"]
+
+
+def test_motor_auto_expande(tmp_path):
+    ruta = _escribir(tmp_path, """
+        categorias: ["x"]
+        motor_busqueda: "auto"
+    """)
+    cfg = Config.cargar(ruta)
+    assert cfg.motores[0] == "duckduckgo" and len(cfg.motores) >= 2
+
+
+def test_motor_lista(tmp_path):
+    ruta = _escribir(tmp_path, """
+        categorias: ["x"]
+        motor_busqueda: ["duckduckgo", "google", "duckduckgo"]
+    """)
+    # Se respeta el orden y se quitan duplicados
+    assert Config.cargar(ruta).motores == ["duckduckgo", "google"]
+
+
 def test_sin_nada_que_buscar(tmp_path):
     ruta = _escribir(tmp_path, """
         ubicaciones: ["Madrid"]

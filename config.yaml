@@ -8,6 +8,12 @@
 # --- Buscador a usar --------------------------------------------------
 # Opciones: "duckduckgo" (recomendado, tolera bien la automatización)
 #           "bing"       (permite más páginas de resultados)
+#           "mojeek"     (buscador propio, muy tolerante)
+#           "startpage"  (resultados de Google; puede pedir aceptar cookies)
+#           "google"     (frágil: suele mostrar CAPTCHA/consentimiento)
+#           "auto"       (prueba duckduckgo, luego mojeek, luego bing)
+# También puedes poner una lista y se prueban en orden hasta obtener resultados:
+#   motor_busqueda: [duckduckgo, mojeek, bing]
 motor_busqueda: duckduckgo
 
 # Región/idioma para orientar los resultados (buscará sobre todo en España)
@@ -124,8 +130,13 @@ palabras_relevancia:
 # Si es true, NO guarda las webs cuya relevancia sea 0 (ninguna palabra encontrada)
 guardar_solo_relevantes: false
 
+# Si es true, comprueba por DNS que el dominio de cada correo existe y descarta
+# los que no resuelven (webs caídas o correos mal escritos). Es más lento y
+# opcional; si tu DNS falla no descarta nada (para no perder contactos válidos).
+verificar_dominio: false
+
 # --- Salida -----------------------------------------------------------
 # Se generan  <archivo_salida>.csv, .xlsx  y  .html  (panel navegable)
 # Columnas: nombre, correo, tipo_correo, telefonos, provincia, codigo_postal,
-#           categoria, relevancia, web, redes, dominio, busqueda, fecha
+#           categoria, relevancia, web, redes, dominio, grupo, busqueda, fecha
 archivo_salida: resultados

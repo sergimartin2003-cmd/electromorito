@@ -16,7 +16,7 @@ from .extract import clasificar_correo
 
 CAMPOS = [
     "nombre", "correo", "tipo_correo", "telefonos", "provincia", "codigo_postal",
-    "categoria", "relevancia", "web", "redes", "dominio", "busqueda", "fecha",
+    "categoria", "relevancia", "web", "redes", "dominio", "grupo", "busqueda", "fecha",
 ]
 
 
@@ -140,6 +140,7 @@ class Almacen:
             "redes": "; ".join(org.get("redes") or []),
             "web": org.get("web", ""),
             "dominio": dom,
+            "grupo": org.get("grupo", ""),
             "busqueda": org.get("busqueda", ""),
             "fecha": fecha,
         }

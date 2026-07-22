@@ -2,8 +2,9 @@
 
 import csv
 
+from scraper import util
 from scraper.storage import CAMPOS, Almacen
-from scraper.util import dominio, dominio_registrable
+from scraper.util import dominio, dominio_registrable, dominio_resuelve
 
 
 # --- util ----------------------------------------------------------------
@@ -21,6 +22,18 @@ def test_dominio_registrable_sufijo_compuesto():
 
 def test_dominio_url_invalida():
     assert dominio("no-es-una-url") == ""
+
+
+def test_dominio_resuelve_vacio():
+    assert dominio_resuelve("") is False
+
+
+def test_dominio_resuelve_usa_cache():
+    # Inyectamos en la caché para no depender de la red
+    util._cache_dns["si-resuelve.test"] = True
+    util._cache_dns["no-resuelve.test"] = False
+    assert dominio_resuelve("si-resuelve.test") is True
+    assert dominio_resuelve("no-resuelve.test") is False
 
 
 # --- storage -------------------------------------------------------------

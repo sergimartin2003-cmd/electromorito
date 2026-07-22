@@ -40,6 +40,11 @@ class Config:
     palabras_relevancia: List[str] = field(default_factory=list)
     # Si es True, no guarda organizaciones cuya relevancia sea 0
     guardar_solo_relevantes: bool = False
+    # Si es True, comprueba por DNS que el dominio del correo existe (más lento)
+    verificar_dominio: bool = False
+
+    # Lista de buscadores a usar (derivada de motor_busqueda; no se edita a mano)
+    motores: List[str] = field(default_factory=list)
 
     # ------------------------------------------------------------------
     @classmethod
@@ -97,12 +102,29 @@ class Config:
         self.bloquear_recursos = _booleano(self.bloquear_recursos, True)
         self.respetar_robots = _booleano(self.respetar_robots, True)
         self.guardar_solo_relevantes = _booleano(self.guardar_solo_relevantes, False)
+        self.verificar_dominio = _booleano(self.verificar_dominio, False)
 
-        self.motor_busqueda = str(self.motor_busqueda).strip().lower()
-        if self.motor_busqueda not in ("duckduckgo", "bing"):
-            raise ValueError(
-                f"motor_busqueda '{self.motor_busqueda}' no válido. Usa 'duckduckgo' o 'bing'."
-            )
+        # Motor(es) de búsqueda: admite un nombre, "auto" o una lista de nombres.
+        from .search import MOTORES_AUTO, MOTORES_VALIDOS  # import diferido (evita ciclo)
+        crudo = self.motor_busqueda
+        if isinstance(crudo, list):
+            motores = [str(m).strip().lower() for m in crudo if str(m).strip()]
+        else:
+            motores = [str(crudo).strip().lower()]
+        for m in motores:
+            if m not in MOTORES_VALIDOS:
+                raise ValueError(
+                    f"motor_busqueda '{m}' no válido. Opciones: "
+                    f"{', '.join(sorted(MOTORES_VALIDOS))}."
+                )
+        expandidos: List[str] = []
+        for m in motores:
+            expandidos.extend(MOTORES_AUTO if m == "auto" else [m])
+        vistos: set = set()
+        self.motores = [x for x in expandidos if not (x in vistos or vistos.add(x))]
+        if not self.motores:
+            self.motores = list(MOTORES_AUTO)
+        self.motor_busqueda = ", ".join(self.motores)
         if self.espera_max_segundos < self.espera_min_segundos:
             self.espera_max_segundos = self.espera_min_segundos
         if not self.archivo_salida or not str(self.archivo_salida).strip():

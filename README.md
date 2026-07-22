@@ -67,14 +67,20 @@ Todo se controla desde **`config.yaml`** (está comentado en español). Lo más 
 | `categorias` | Tipos de organización a buscar. Añade o quita líneas. |
 | `ubicaciones` | Ciudades/provincias. Se combinan con cada categoría. |
 | `busquedas_extra` | Búsquedas sueltas escritas a mano. |
-| `motor_busqueda` | `duckduckgo` (recomendado) o `bing`. |
+| `motor_busqueda` | `duckduckgo`, `bing`, `mojeek`, `startpage`, `google`, `auto`, o una lista. |
 | `resultados_por_busqueda` | Cuántas webs coger de cada búsqueda. |
 | `navegador_visible` | `true` para ver el navegador; `false` para que vaya oculto y más rápido. |
 | `respetar_robots` | `true` = respeta el `robots.txt` de cada web (recomendado). |
 | `espera_min_segundos` / `espera_max_segundos` | Pausa entre webs para no saturar servidores. |
 | `palabras_relevancia` | Palabras del tema que se cuentan para puntuar cada web. |
 | `guardar_solo_relevantes` | `true` = descarta las webs con relevancia 0. |
+| `verificar_dominio` | `true` = comprueba por DNS que el dominio del correo existe (más lento). |
 | `archivo_salida` | Nombre base de los ficheros de salida. |
+
+**Buscadores.** `duckduckgo` y `mojeek` toleran bien la automatización; `bing` va
+razonablemente; `startpage` y `google` son más frágiles (suelen pedir aceptar
+cookies o mostrar CAPTCHA). Con `auto` (o una lista) se prueban varios en orden y
+se usa el primero que dé resultados — útil si uno empieza a limitarte.
 
 Con las listas de ejemplo salen **240 búsquedas**. Empieza con pocas ciudades
 para probar y ve ampliando.
@@ -118,7 +124,7 @@ Se generan **tres** ficheros: `resultados.csv`, `resultados.xlsx` y
 `resultados.html` (un panel navegable, ver más abajo). Columnas:
 
 `nombre` · `correo` · `tipo_correo` · `telefonos` · `provincia` · `codigo_postal` ·
-`categoria` · `relevancia` · `web` · `redes` · `dominio` · `busqueda` · `fecha`
+`categoria` · `relevancia` · `web` · `redes` · `dominio` · `grupo` · `busqueda` · `fecha`
 
 - **`tipo_correo`**: `genérico` (buzón tipo `info@`, ideal para contacto), `personal`
   (parece `nombre.apellido@`), `gratuito` (gmail, hotmail…) u `otro`.
@@ -129,6 +135,9 @@ Se generan **tres** ficheros: `resultados.csv`, `resultados.xlsx` y
   ser un resultado que no va del tema.
 - **`redes`**: enlaces a perfiles de redes sociales (Facebook, Instagram, LinkedIn…),
   útiles como vía de contacto alternativa.
+- **`grupo`**: nombre normalizado de la organización. Las filas con el mismo `grupo`
+  son probablemente la **misma organización** (aunque aparezca con varias webs), para
+  no contactarla dos veces. Al terminar se indica cuántos posibles duplicados hay.
 
 Hay **una fila por cada correo** encontrado (los correos no se repiten en todo el
 fichero). El `.xlsx` es cómodo para abrir en Excel/LibreOffice y **ordenar por
