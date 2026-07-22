@@ -211,8 +211,9 @@ Para regenerarla desde un CSV ya existente: `python run.py --contactos`.
   funciona tanto en DuckDuckGo como en Bing).
 - El detector de teléfonos es **conservador** a propósito (exige `+34` o
   separadores) para evitar falsos positivos; prioriza siempre los enlaces `tel:`.
-- El detector de teléfonos es **conservador** a propósito (exige `+34` o
-  separadores) para evitar falsos positivos; prioriza siempre los enlaces `tel:`.
+- **Correos ocultos**: se descifran automáticamente los protegidos por Cloudflare
+  (`data-cfemail`) y se aceptan los avisos de cookies de cada web por si tapan los
+  datos de contacto.
 
 ---
 

@@ -4,6 +4,7 @@ from scraper.extract import (
     calcular_relevancia,
     clasificar_correo,
     clave_organizacion,
+    descifrar_cf_email,
     extraer_codigo_postal,
     extraer_correos,
     extraer_redes,
@@ -11,6 +12,12 @@ from scraper.extract import (
     limpiar_nombre,
     nombre_estructurado,
 )
+
+
+def _cf_encode(email, clave=0x42):
+    """Codifica un correo como lo hace la protección de email de Cloudflare."""
+    b = [clave] + [ord(c) ^ clave for c in email]
+    return "".join(f"{x:02x}" for x in b)
 
 PALABRAS = ["discapacidad", "educación especial", "fundación", "IFE", "PFI", "inclusión"]
 
@@ -50,6 +57,24 @@ def test_filtra_dominios_malformados():
 def test_filtra_plataformas_web_y_sistema():
     ruido = "web@wordpress.com postmaster@fundacion.org nombre.apellido@x.org"
     assert extraer_correos(ruido + " real@centro.es") == ["real@centro.es"]
+
+
+# --- Cloudflare email protection -----------------------------------------
+def test_cf_descifra_ida_y_vuelta():
+    assert descifrar_cf_email(_cf_encode("info@fundacion.org")) == "info@fundacion.org"
+
+
+def test_cf_hex_invalido():
+    assert descifrar_cf_email("zz") == ""
+    assert descifrar_cf_email("") == ""
+
+
+def test_correos_desde_cloudflare():
+    html = (
+        f'<a class="__cf_email__" data-cfemail="{_cf_encode("a@fund.org")}">x</a>'
+        f'<a href="/cdn-cgi/l/email-protection#{_cf_encode("b@centro.es", 0x5a)}">y</a>'
+    )
+    assert extraer_correos(html) == ["a@fund.org", "b@centro.es"]
 
 
 def test_correos_sin_duplicados_y_ordenados():

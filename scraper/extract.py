@@ -71,6 +71,29 @@ def _desofuscar(texto: str) -> str:
     return t
 
 
+# Correos ocultos por la "protección de email" de Cloudflare
+_CF_ATTR_RE = re.compile(r'data-cfemail=["\']([0-9a-fA-F]{6,})["\']')
+_CF_HREF_RE = re.compile(r'/cdn-cgi/l/email-protection#([0-9a-fA-F]{6,})')
+
+
+def descifrar_cf_email(cfhex: str) -> str:
+    """Descifra un correo ofuscado por Cloudflare (data-cfemail). '' si no es válido.
+
+    El primer byte es la clave; el resto se XOR-ea con ella.
+    """
+    try:
+        datos = bytes.fromhex(cfhex)
+    except (ValueError, TypeError):
+        return ""
+    if len(datos) < 2:
+        return ""
+    clave = datos[0]
+    try:
+        return "".join(chr(b ^ clave) for b in datos[1:])
+    except ValueError:
+        return ""
+
+
 def _correo_valido(correo: str) -> bool:
     correo = correo.strip().strip(".").lower()
     if not correo or "@" not in correo:
@@ -113,6 +136,12 @@ def extraer_correos(contenido: str, mailtos: Optional[Iterable[str]] = None) -> 
             parte = parte.strip().lower()
             if _correo_valido(parte):
                 encontrados.add(parte.strip(".").lower())
+
+    # Correos ocultos por la protección de email de Cloudflare
+    for cfhex in _CF_ATTR_RE.findall(contenido or "") + _CF_HREF_RE.findall(contenido or ""):
+        correo = descifrar_cf_email(cfhex)
+        if _correo_valido(correo):
+            encontrados.add(correo.strip(".").lower())
 
     fuente = _desofuscar(contenido or "")
     for m in _EMAIL_RE.findall(fuente):

@@ -105,6 +105,29 @@ def _abrir(page, url: str, config: Config, reintentos: int = 0) -> bool:
     return False
 
 
+# Selectores habituales del botón "aceptar cookies" (bibliotecas y textos comunes)
+_COOKIES_SELECTORES = (
+    "#onetrust-accept-btn-handler", ".cc-allow", "#cookie-accept", ".cookie-accept",
+    ".js-accept-cookies", "#aceptarCookies", "#acceptCookies",
+    "button:has-text('Aceptar todo')", "button:has-text('Aceptar todas')",
+    "button:has-text('Aceptar cookies')", "button:has-text('Aceptar y cerrar')",
+    "button:has-text('Accept all')", "a:has-text('Aceptar todo')",
+)
+
+
+def _aceptar_cookies(page) -> None:
+    """Cierra el aviso de cookies de la web (mejor esfuerzo) por si tapa el contenido."""
+    for selector in _COOKIES_SELECTORES:
+        try:
+            el = page.query_selector(selector)
+            if el and el.is_visible():
+                el.click(timeout=1500)
+                page.wait_for_timeout(300)
+                return
+        except Exception:
+            continue
+
+
 def _texto_y_html(page) -> str:
     """Combina el HTML renderizado y el texto visible del body."""
     partes = []
@@ -197,6 +220,7 @@ def analizar_web(
     if not _abrir(page, url, config, reintentos=1):
         return None
 
+    _aceptar_cookies(page)  # por si un aviso de cookies tapa los datos de contacto
     contenido = [_texto_y_html(page)]
     mailtos = _mailtos(page)
     tels_href = _tels_href(page)
