@@ -1,0 +1,17 @@
+# Entornos de Python
+venv/
+.venv/
+env/
+__pycache__/
+*.pyc
+
+# Resultados generados por el scraper
+resultados.csv
+resultados.xlsx
+*_dominios_visitados.txt
+salida/
+*.log
+
+# Sistema
+.DS_Store
+Thumbs.db

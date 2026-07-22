@@ -1,0 +1,7 @@
+# Dependencias del scraper de contactos
+# Instálalas con:  pip install -r requirements.txt
+# Y luego:         playwright install chromium
+
+playwright>=1.40
+PyYAML>=6.0
+openpyxl>=3.1

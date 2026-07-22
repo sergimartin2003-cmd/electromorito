@@ -1,0 +1,105 @@
+# =========================================================================
+#  CONFIGURACIÓN DEL SCRAPER DE CONTACTOS
+# =========================================================================
+#  Edita este archivo para decidir QUÉ buscar y CÓMO comportarse.
+#  Todo está en español. Guarda el archivo y ejecuta:  python run.py
+# =========================================================================
+
+# --- Buscador a usar --------------------------------------------------
+# Opciones: "duckduckgo" (recomendado, tolera bien la automatización)
+#           "bing"       (permite más páginas de resultados)
+motor_busqueda: duckduckgo
+
+# Región/idioma para orientar los resultados (buscará sobre todo en España)
+idioma_region: es-es
+
+# --- Qué buscar -------------------------------------------------------
+# El scraper combina CADA categoría con CADA ubicación.
+# Ejemplo: "fundación discapacidad" + "Madrid" => "fundación discapacidad Madrid"
+# Con las listas de abajo salen varios cientos de búsquedas.
+categorias:
+  - "fundación discapacidad"
+  - "fundación personas con discapacidad"
+  - "asociación discapacidad"
+  - "centro de educación especial"
+  - "centro ocupacional discapacidad"
+  - "escuela PFI programa de formación e inserción"
+  - "centro IFE itinerario formativo específico"
+  - "centro de estudios formación"
+
+ubicaciones:
+  - Madrid
+  - Barcelona
+  - Valencia
+  - Sevilla
+  - Zaragoza
+  - Málaga
+  - Murcia
+  - Bilbao
+  - Alicante
+  - Córdoba
+  - Valladolid
+  - Vigo
+  - Gijón
+  - "A Coruña"
+  - Granada
+  - "Palma de Mallorca"
+  - "Las Palmas"
+  - "Santa Cruz de Tenerife"
+  - Pamplona
+  - Santander
+  - "San Sebastián"
+  - Girona
+  - Tarragona
+  - Lleida
+  - Castellón
+  - Badajoz
+  - Salamanca
+  - León
+  - Burgos
+  - Toledo
+
+# Búsquedas sueltas adicionales (se añaden tal cual, sin combinar con ubicaciones)
+busquedas_extra: []
+#  - "fundación autismo Cataluña contacto"
+#  - "escuela educación especial Andalucía email"
+
+# --- Cuánto rastrear --------------------------------------------------
+resultados_por_busqueda: 15      # cuántas webs coger de cada búsqueda
+paginas_por_busqueda: 1          # páginas de resultados (solo afecta a Bing)
+max_paginas_por_web: 4           # portada + páginas de contacto/aviso legal a visitar
+max_busquedas: 0                 # 0 = sin límite. Pon p.ej. 5 para una prueba rápida
+
+# --- Comportamiento del navegador -------------------------------------
+navegador_visible: true          # true = ves el navegador; false = oculto (más rápido)
+bloquear_recursos: true          # no descarga imágenes/vídeos/fuentes (mucho más rápido)
+timeout_segundos: 30             # tiempo máximo de espera al cargar una web
+
+# --- Buen comportamiento (no saturar los servidores) ------------------
+espera_min_segundos: 2.0         # pausa aleatoria mínima entre webs
+espera_max_segundos: 5.0         # pausa aleatoria máxima entre webs
+respetar_robots: true            # respeta el robots.txt de cada web (recomendado)
+
+# Dominios que NUNCA se rastrean (redes sociales, directorios, buscadores…)
+dominios_excluidos:
+  - facebook.com
+  - instagram.com
+  - twitter.com
+  - x.com
+  - linkedin.com
+  - youtube.com
+  - tiktok.com
+  - wikipedia.org
+  - google.com
+  - bing.com
+  - duckduckgo.com
+  - amazon.es
+  - amazon.com
+  - pinterest.com
+  - yelp.com
+  - paginasamarillas.es
+  - infojobs.net
+
+# --- Salida -----------------------------------------------------------
+# Se generan  <archivo_salida>.csv  y  <archivo_salida>.xlsx
+archivo_salida: resultados

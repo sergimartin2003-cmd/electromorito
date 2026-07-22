@@ -1,0 +1,152 @@
+"""Orquesta todo el proceso: buscar -> filtrar -> visitar cada web -> guardar."""
+
+from __future__ import annotations
+
+import sys
+from typing import List
+
+from .config import Config
+from .crawl import _USER_AGENT, analizar_web, robots_permite
+from .search import buscar
+from .storage import Almacen
+from .util import dominio_registrable, espera_aleatoria
+
+
+def _log(msg: str) -> None:
+    print(msg, flush=True)
+
+
+def _dominio_excluido(url: str, config: Config) -> bool:
+    dom = dominio_registrable(url)
+    if not dom:
+        return True
+    for excluido in config.dominios_excluidos:
+        excluido = excluido.strip().lower()
+        if excluido and (dom == excluido or dom.endswith("." + excluido)):
+            return True
+    return False
+
+
+def _filtrar_urls(urls: List[str], config: Config) -> List[str]:
+    """Quita duplicados por dominio, dominios excluidos y limita al máximo configurado."""
+    vistos = set()
+    limpias: List[str] = []
+    for url in urls:
+        if not url or not url.startswith("http"):
+            continue
+        if _dominio_excluido(url, config):
+            continue
+        dom = dominio_registrable(url)
+        if dom in vistos:
+            continue
+        vistos.add(dom)
+        limpias.append(url)
+        if len(limpias) >= config.resultados_por_busqueda:
+            break
+    return limpias
+
+
+def ejecutar(config: Config) -> None:
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        _log(
+            "\nERROR: Playwright no está instalado.\n"
+            "Instálalo con:\n"
+            "    pip install -r requirements.txt\n"
+            "    playwright install chromium\n"
+        )
+        sys.exit(1)
+
+    consultas = config.construir_busquedas()
+    almacen = Almacen(config)
+
+    _log("=" * 64)
+    _log("  SCRAPER DE CONTACTOS")
+    _log("=" * 64)
+    _log(f"  Buscador:            {config.motor_busqueda}")
+    _log(f"  Búsquedas a realizar: {len(consultas)}")
+    _log(f"  Navegador visible:    {'sí' if config.navegador_visible else 'no'}")
+    _log(f"  Salida:               {almacen.ruta_csv}  /  {almacen.ruta_xlsx}")
+    if almacen.dominios_vistos:
+        _log(f"  Reanudando: {len(almacen.dominios_vistos)} dominios ya visitados se saltarán.")
+    _log("=" * 64 + "\n")
+
+    total_correos = len(almacen.correos_vistos)
+    total_orgs = 0
+
+    with sync_playwright() as p:
+        navegador = p.chromium.launch(headless=not config.navegador_visible)
+        contexto = navegador.new_context(
+            user_agent=_USER_AGENT,
+            locale="es-ES",
+            viewport={"width": 1366, "height": 900},
+        )
+
+        if config.bloquear_recursos:
+            def _ruta(route):
+                if route.request.resource_type in ("image", "media", "font", "stylesheet"):
+                    route.abort()
+                else:
+                    route.continue_()
+            contexto.route("**/*", _ruta)
+
+        page = contexto.new_page()
+
+        try:
+            for i, (categoria, consulta) in enumerate(consultas, start=1):
+                _log(f"[{i}/{len(consultas)}] Buscando: '{consulta}'")
+                try:
+                    urls = _filtrar_urls(buscar(page, consulta, config), config)
+                except Exception as e:  # noqa: BLE001
+                    _log(f"    Error en la búsqueda: {e}")
+                    urls = []
+                _log(f"    -> {len(urls)} webs candidatas")
+
+                for url in urls:
+                    dom = dominio_registrable(url)
+                    if dom in almacen.dominios_vistos:
+                        continue
+                    if not robots_permite(url, config):
+                        _log(f"    · (robots.txt no permite)  {dom}")
+                        almacen.dominios_vistos.add(dom)
+                        continue
+
+                    try:
+                        org = analizar_web(page, url, config, categoria, consulta)
+                    except Exception as e:  # noqa: BLE001
+                        _log(f"    · error al visitar {dom}: {e}")
+                        almacen.dominios_vistos.add(dom)
+                        org = None
+
+                    if org:
+                        nuevos = almacen.guardar_organizacion(org)
+                        total_orgs += 1
+                        n_correos = len(org.get("correos") or [])
+                        etiqueta = org.get("nombre") or dom
+                        if n_correos:
+                            _log(f"    ✓ {etiqueta[:50]} — {n_correos} correo(s), +{nuevos} nuevo(s)")
+                        elif org.get("telefonos"):
+                            _log(f"    ~ {etiqueta[:50]} — sin correo, teléfono guardado")
+                        else:
+                            _log(f"    · {etiqueta[:50]} — sin datos de contacto")
+
+                    espera_aleatoria(config.espera_min_segundos, config.espera_max_segundos)
+
+        except KeyboardInterrupt:
+            _log("\n  Interrumpido por el usuario. Guardando lo recogido hasta ahora…")
+        finally:
+            try:
+                navegador.close()
+            except Exception:
+                pass
+
+    nuevos_correos = len(almacen.correos_vistos) - total_correos
+    _log("\n" + "=" * 64)
+    _log(f"  FIN. Webs visitadas esta sesión: {total_orgs}")
+    _log(f"       Correos nuevos añadidos:    {nuevos_correos}")
+    _log(f"       Total de filas en el CSV:   {len(almacen.filas)}")
+    if almacen.exportar_excel():
+        _log(f"       Excel generado:             {almacen.ruta_xlsx}")
+    _log(f"       CSV:                        {almacen.ruta_csv}")
+    _log("=" * 64)
