@@ -77,6 +77,10 @@ max_paginas_por_web: 4           # portada + páginas de contacto/aviso legal a 
 max_busquedas: 0                 # 0 = sin límite. Pon p.ej. 5 para una prueba rápida
 
 # --- Comportamiento del navegador -------------------------------------
+# Ruta a un Chrome/Chromium ya instalado (déjalo vacío para usar el de Playwright).
+# Útil si no puedes ejecutar "playwright install". Ej. en Windows:
+#   ruta_navegador: "C:/Program Files/Google/Chrome/Application/chrome.exe"
+ruta_navegador: ""
 navegador_visible: true          # true = ves el navegador; false = oculto (más rápido)
 bloquear_recursos: true          # no descarga imágenes/vídeos/fuentes (mucho más rápido)
 timeout_segundos: 30             # tiempo máximo de espera al cargar una web

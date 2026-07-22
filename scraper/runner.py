@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import sys
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from .config import Config
 from .crawl import _USER_AGENT, analizar_web, robots_permite
@@ -32,8 +32,12 @@ def _dominio_excluido(url: str, config: Config) -> bool:
     return False
 
 
-def _filtrar_urls(urls: List[str], config: Config) -> List[str]:
-    """Quita duplicados por dominio, dominios excluidos y limita al máximo configurado."""
+def _filtrar_urls(urls: List[str], config: Config, limite: Optional[int] = None) -> List[str]:
+    """Quita duplicados por dominio, dominios excluidos y limita al máximo indicado.
+
+    `limite`: None usa config.resultados_por_busqueda; 0 = sin límite.
+    """
+    tope = config.resultados_por_busqueda if limite is None else limite
     vistos = set()
     limpias: List[str] = []
     for url in urls:
@@ -46,22 +50,68 @@ def _filtrar_urls(urls: List[str], config: Config) -> List[str]:
             continue
         vistos.add(dom)
         limpias.append(url)
-        if config.resultados_por_busqueda > 0 and len(limpias) >= config.resultados_por_busqueda:
+        if tope > 0 and len(limpias) >= tope:
             break
     return limpias
 
 
 def _lanzar_navegador(p, config: Config):
-    """Lanza Chromium. Reintenta con --no-sandbox (necesario en algunos Linux)."""
+    """Lanza Chromium. Reintenta con --no-sandbox (necesario en algunos Linux).
+
+    Si se indica una ruta a un navegador (config.ruta_navegador o la variable de
+    entorno SCRAPER_NAVEGADOR), se usa ese ejecutable en vez del de Playwright.
+    """
+    import os
     args = ["--disable-blink-features=AutomationControlled"]
     headless = not config.navegador_visible
+    ruta = (os.environ.get("SCRAPER_NAVEGADOR") or getattr(config, "ruta_navegador", "") or "").strip()
+    extra = {"executable_path": ruta} if ruta else {}
     try:
-        return p.chromium.launch(headless=headless, args=args)
+        return p.chromium.launch(headless=headless, args=args, **extra)
     except Exception:
-        return p.chromium.launch(headless=headless, args=args + ["--no-sandbox"])
+        return p.chromium.launch(headless=headless, args=args + ["--no-sandbox"], **extra)
 
 
-def ejecutar(config: Config) -> None:
+def _procesar_urls(page, urls, config: Config, almacen, categoria: str,
+                   provincia: str, busqueda: str, espera) -> int:
+    """Visita cada URL, extrae y guarda. Devuelve cuántas organizaciones procesó."""
+    procesadas = 0
+    for url in urls:
+        dom = dominio_registrable(url)
+        if dom in almacen.dominios_vistos:
+            continue
+        if not robots_permite(url, config):
+            _log(f"    · (robots.txt no permite)  {dom}")
+            almacen.dominios_vistos.add(dom)
+            continue
+        try:
+            org = analizar_web(page, url, config, categoria, provincia, busqueda)
+        except Exception as e:  # noqa: BLE001
+            _log(f"    · error al visitar {dom}: {e}")
+            almacen.dominios_vistos.add(dom)
+            org = None
+
+        if org:
+            if config.guardar_solo_relevantes and org.get("relevancia", 0) == 0:
+                almacen.dominios_vistos.add(dom)
+                _log(f"    · {(org.get('nombre') or dom)[:50]} — sin relevancia, descartada")
+            else:
+                nuevos = almacen.guardar_organizacion(org)
+                procesadas += 1
+                n_correos = len(org.get("correos") or [])
+                rel = org.get("relevancia", 0)
+                etiqueta = org.get("nombre") or dom
+                if n_correos:
+                    _log(f"    ✓ {etiqueta[:50]} — {n_correos} correo(s), +{nuevos} nuevo(s) [rel:{rel}]")
+                elif org.get("telefonos"):
+                    _log(f"    ~ {etiqueta[:50]} — sin correo, teléfono guardado [rel:{rel}]")
+                else:
+                    _log(f"    · {etiqueta[:50]} — sin datos de contacto")
+        espera.esperar()
+    return procesadas
+
+
+def ejecutar(config: Config, urls_directas: Optional[List[str]] = None) -> None:
     try:
         from playwright.sync_api import sync_playwright
     except ImportError:
@@ -73,14 +123,18 @@ def ejecutar(config: Config) -> None:
         )
         sys.exit(1)
 
-    consultas = config.construir_busquedas()
+    modo_lista = urls_directas is not None
+    consultas = config.construir_busquedas() if not modo_lista else []
     almacen = Almacen(config)
 
     _log("=" * 64)
     _log("  SCRAPER DE CONTACTOS")
     _log("=" * 64)
-    _log(f"  Buscador:            {config.motor_busqueda}")
-    _log(f"  Búsquedas a realizar: {len(consultas)}")
+    if modo_lista:
+        _log(f"  Modo:                 lista de URLs ({len(urls_directas)})")
+    else:
+        _log(f"  Buscador:            {config.motor_busqueda}")
+        _log(f"  Búsquedas a realizar: {len(consultas)}")
     _log(f"  Navegador visible:    {'sí' if config.navegador_visible else 'no'}")
     _log(f"  Salida:               {almacen.ruta_csv}  /  {almacen.ruta_xlsx}")
     if almacen.dominios_vistos:
@@ -126,66 +180,38 @@ def ejecutar(config: Config) -> None:
         espera = EsperaAdaptativa(config.espera_min_segundos, config.espera_max_segundos)
         vacios_seguidos = 0
         try:
-            for i, (categoria, provincia, consulta) in enumerate(consultas, start=1):
-                preferido = gestor.preferido()
-                etiqueta_motor = f" [{preferido}]" if len(config.motores) > 1 else ""
-                _log(f"[{i}/{len(consultas)}]{etiqueta_motor} Buscando: '{consulta}'")
-                rotaciones_antes = gestor.rotaciones
-                try:
-                    urls = _filtrar_urls(gestor.buscar(page, consulta, config), config)
-                except Exception as e:  # noqa: BLE001
-                    _log(f"    Error en la búsqueda: {e}")
-                    urls = []
-                _log(f"    -> {len(urls)} webs candidatas")
-
-                # Espera adaptativa: sube el ritmo si va mal, lo baja si va bien
-                if config.espera_adaptativa:
-                    (espera.penalizar if not urls else espera.recuperar)()
-                if gestor.rotaciones > rotaciones_antes:
-                    _log(f"    ↻ Cambiando de buscador a '{gestor.preferido()}' (el anterior fallaba)")
-
-                # Detecta posible bloqueo del buscador (muchas búsquedas seguidas vacías)
-                vacios_seguidos = vacios_seguidos + 1 if not urls else 0
-                aviso = aviso_buscador(vacios_seguidos)
-                if aviso:
-                    ritmo = f" (ritmo x{espera.multiplicador:.1f})" if espera.multiplicador > 1 else ""
-                    _log(f"    ⚠ {aviso}{ritmo}")
-
-                for url in urls:
-                    dom = dominio_registrable(url)
-                    if dom in almacen.dominios_vistos:
-                        continue
-                    if not robots_permite(url, config):
-                        _log(f"    · (robots.txt no permite)  {dom}")
-                        almacen.dominios_vistos.add(dom)
-                        continue
-
+            if modo_lista:
+                urls = _filtrar_urls(urls_directas, config, limite=0)
+                _log(f"Procesando {len(urls)} URLs de la lista…")
+                total_orgs += _procesar_urls(page, urls, config, almacen, "", "", "lista", espera)
+            else:
+                for i, (categoria, provincia, consulta) in enumerate(consultas, start=1):
+                    preferido = gestor.preferido()
+                    etiqueta_motor = f" [{preferido}]" if len(config.motores) > 1 else ""
+                    _log(f"[{i}/{len(consultas)}]{etiqueta_motor} Buscando: '{consulta}'")
+                    rotaciones_antes = gestor.rotaciones
                     try:
-                        org = analizar_web(page, url, config, categoria, provincia, consulta)
+                        urls = _filtrar_urls(gestor.buscar(page, consulta, config), config)
                     except Exception as e:  # noqa: BLE001
-                        _log(f"    · error al visitar {dom}: {e}")
-                        almacen.dominios_vistos.add(dom)
-                        org = None
+                        _log(f"    Error en la búsqueda: {e}")
+                        urls = []
+                    _log(f"    -> {len(urls)} webs candidatas")
 
-                    if org:
-                        # Filtro opcional: descarta webs sin ninguna señal del tema buscado
-                        if config.guardar_solo_relevantes and org.get("relevancia", 0) == 0:
-                            almacen.dominios_vistos.add(dom)
-                            _log(f"    · {(org.get('nombre') or dom)[:50]} — sin relevancia, descartada")
-                        else:
-                            nuevos = almacen.guardar_organizacion(org)
-                            total_orgs += 1
-                            n_correos = len(org.get("correos") or [])
-                            rel = org.get("relevancia", 0)
-                            etiqueta = org.get("nombre") or dom
-                            if n_correos:
-                                _log(f"    ✓ {etiqueta[:50]} — {n_correos} correo(s), +{nuevos} nuevo(s) [rel:{rel}]")
-                            elif org.get("telefonos"):
-                                _log(f"    ~ {etiqueta[:50]} — sin correo, teléfono guardado [rel:{rel}]")
-                            else:
-                                _log(f"    · {etiqueta[:50]} — sin datos de contacto")
+                    # Espera adaptativa: sube el ritmo si va mal, lo baja si va bien
+                    if config.espera_adaptativa:
+                        (espera.penalizar if not urls else espera.recuperar)()
+                    if gestor.rotaciones > rotaciones_antes:
+                        _log(f"    ↻ Cambiando de buscador a '{gestor.preferido()}' (el anterior fallaba)")
 
-                    espera.esperar()
+                    # Detecta posible bloqueo del buscador (muchas búsquedas seguidas vacías)
+                    vacios_seguidos = vacios_seguidos + 1 if not urls else 0
+                    aviso = aviso_buscador(vacios_seguidos)
+                    if aviso:
+                        ritmo = f" (ritmo x{espera.multiplicador:.1f})" if espera.multiplicador > 1 else ""
+                        _log(f"    ⚠ {aviso}{ritmo}")
+
+                    total_orgs += _procesar_urls(
+                        page, urls, config, almacen, categoria, provincia, consulta, espera)
 
         except KeyboardInterrupt:
             _log("\n  Interrumpido por el usuario. Guardando lo recogido hasta ahora…")

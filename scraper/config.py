@@ -36,6 +36,8 @@ class Config:
 
     dominios_excluidos: List[str] = field(default_factory=list)
     archivo_salida: str = "resultados"
+    # Ruta a un Chrome/Chromium ya instalado (si no puedes usar 'playwright install')
+    ruta_navegador: str = ""
 
     # Palabras que indican que la web trata del tema buscado (para puntuar relevancia)
     palabras_relevancia: List[str] = field(default_factory=list)
@@ -132,6 +134,7 @@ class Config:
         if not self.archivo_salida or not str(self.archivo_salida).strip():
             self.archivo_salida = "resultados"
         self.archivo_salida = str(self.archivo_salida).strip()
+        self.ruta_navegador = str(self.ruta_navegador or "").strip()
         if not self.categorias and not self.busquedas_extra:
             raise ValueError(
                 "No hay nada que buscar: define 'categorias' o 'busquedas_extra' en config.yaml."

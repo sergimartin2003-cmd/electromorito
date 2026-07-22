@@ -38,6 +38,15 @@ Los resultados se guardan en **`resultados.csv`** y **`resultados.xlsx`**.
 
 ## Instalación (una sola vez)
 
+### Opción fácil (recomendada): los lanzadores
+
+- **Windows:** haz **doble clic en `run.bat`**. La primera vez crea el entorno,
+  instala todo y ejecuta; las siguientes veces solo ejecuta.
+- **Mac / Linux:** en una terminal, `./run.sh` (puedes pasarle opciones, p. ej.
+  `./run.sh --prueba`).
+
+### Opción manual
+
 Abre una terminal (en Windows: *PowerShell* o *Símbolo del sistema*) **dentro de
 la carpeta del proyecto** y ejecuta:
 
@@ -117,6 +126,8 @@ Opciones disponibles:
 | `--salida NOMBRE` / `-o` | Nombre base de los ficheros de salida. |
 | `--informe` | No rastrea: solo regenera el panel HTML desde el CSV. |
 | `--contactos` | No rastrea: genera la lista depurada de contactos desde el CSV. |
+| `--desde-urls ARCHIVO` | No busca: extrae los contactos de una lista de URLs (una por línea). |
+| `--navegador RUTA` | Usa un Chrome/Chromium ya instalado (si no usas `playwright install`). |
 | `-c ARCHIVO` | Usa otro archivo de configuración. |
 
 - Puedes **detenerlo en cualquier momento** con `Ctrl + C`: lo ya recogido queda
@@ -185,7 +196,11 @@ Para regenerarla desde un CSV ya existente: `python run.py --contactos`.
 ## Consejos y resolución de problemas
 
 - **"playwright: command not found" / no encuentra el navegador** → ejecuta
-  `pip install -r requirements.txt` y luego `playwright install chromium`.
+  `pip install -r requirements.txt` y luego `playwright install chromium`. Si no
+  puedes instalarlo, usa un Chrome ya instalado con `--navegador "ruta\a\chrome.exe"`
+  (o la opción `ruta_navegador` del `config.yaml`).
+- **¿Ya tienes una lista de webs?** → guárdalas en un `.txt` (una por línea) y usa
+  `python run.py --desde-urls webs.txt`: extrae los contactos sin buscar.
 - **Pocos resultados o el buscador te bloquea** → sube `espera_min_segundos` y
   `espera_max_segundos`, reduce `resultados_por_busqueda`, o pon
   `motor_busqueda: auto` (prueba varios buscadores). No lo lances de forma agresiva.
@@ -246,6 +261,7 @@ python -m pytest
 ```
 electromorito/
 ├── run.py               # lanzador: python run.py
+├── run.sh / run.bat     # lanzadores fáciles (Mac/Linux y Windows)
 ├── config.yaml          # QUÉ buscar y CÓMO (edítalo tú)
 ├── requirements.txt     # dependencias
 ├── requirements-dev.txt # dependencias de test (pytest)
