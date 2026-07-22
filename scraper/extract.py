@@ -173,3 +173,57 @@ def limpiar_nombre(titulo: Optional[str]) -> str:
     # Elimina coletillas típicas al final
     nombre = re.sub(r"\s*[-|]?\s*(inicio|home|bienvenidos?|welcome)\s*$", "", nombre, flags=re.I)
     return nombre.strip()[:150]
+
+
+# --- Clasificación de correos -------------------------------------------
+# Proveedores de correo gratuitos (no son un dominio propio de la organización)
+_PROVEEDORES_GRATUITOS = {
+    "gmail.com", "googlemail.com", "hotmail.com", "hotmail.es", "outlook.com",
+    "outlook.es", "live.com", "live.es", "yahoo.com", "yahoo.es", "icloud.com",
+    "me.com", "aol.com", "gmx.com", "gmx.es", "protonmail.com", "proton.me",
+    "yandex.com", "mail.ru", "terra.es", "telefonica.net", "wanadoo.es",
+}
+
+# Partes locales típicas de un buzón genérico de organización (ideal para contacto)
+_LOCALES_GENERICOS = {
+    "info", "contacto", "contact", "hola", "administracion", "administración",
+    "admin", "secretaria", "secretaría", "recepcion", "recepción", "oficina",
+    "comunicacion", "comunicación", "direccion", "dirección", "gerencia",
+    "general", "correo", "atencion", "atención", "clientes", "rrhh", "empleo",
+    "prensa", "ventas", "comercial", "soporte", "ayuda", "citas", "reservas",
+}
+
+
+def clasificar_correo(correo: str) -> str:
+    """Etiqueta un correo para ayudar a priorizar el contacto.
+
+    Devuelve: 'genérico' (buzón de organización tipo info@),
+              'gratuito' (gmail, hotmail…),
+              'personal' (parece nombre.apellido),
+              'otro'.
+    """
+    correo = (correo or "").lower().strip()
+    local, _, dom = correo.partition("@")
+    if not dom:
+        return "otro"
+    if dom in _PROVEEDORES_GRATUITOS:
+        return "gratuito"
+    base_local = local.split("+")[0]
+    if base_local in _LOCALES_GENERICOS:
+        return "genérico"
+    if "." in base_local or "_" in base_local:
+        return "personal"
+    return "otro"
+
+
+def calcular_relevancia(texto: str, palabras: Iterable[str]) -> int:
+    """Cuenta cuántas palabras clave del tema aparecen en el texto (señales de relevancia)."""
+    if not texto or not palabras:
+        return 0
+    t = texto.lower()
+    encontradas = 0
+    for palabra in palabras:
+        palabra = (palabra or "").strip().lower()
+        if palabra and palabra in t:
+            encontradas += 1
+    return encontradas

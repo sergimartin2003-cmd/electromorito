@@ -72,6 +72,8 @@ Todo se controla desde **`config.yaml`** (está comentado en español). Lo más 
 | `navegador_visible` | `true` para ver el navegador; `false` para que vaya oculto y más rápido. |
 | `respetar_robots` | `true` = respeta el `robots.txt` de cada web (recomendado). |
 | `espera_min_segundos` / `espera_max_segundos` | Pausa entre webs para no saturar servidores. |
+| `palabras_relevancia` | Palabras del tema que se cuentan para puntuar cada web. |
+| `guardar_solo_relevantes` | `true` = descarta las webs con relevancia 0. |
 | `archivo_salida` | Nombre base de los ficheros de salida. |
 
 Con las listas de ejemplo salen **240 búsquedas**. Empieza con pocas ciudades
@@ -101,10 +103,23 @@ python run.py -c mi_config.yaml
 
 Se generan dos ficheros con estas columnas:
 
-`nombre` · `correo` · `telefonos` · `web` · `dominio` · `categoria` · `busqueda` · `fecha`
+`nombre` · `correo` · `tipo_correo` · `telefonos` · `provincia` · `categoria` ·
+`relevancia` · `web` · `dominio` · `busqueda` · `fecha`
+
+- **`tipo_correo`**: `genérico` (buzón tipo `info@`, ideal para contacto), `personal`
+  (parece `nombre.apellido@`), `gratuito` (gmail, hotmail…) u `otro`.
+- **`provincia`**: la ciudad/provincia de la búsqueda que encontró la web.
+- **`relevancia`**: cuántas palabras del tema (discapacidad, PFI, IFE, inclusión…)
+  aparecen en la web. **Cuanto más alto, más probable es que encaje**; un `0` suele
+  ser un resultado que no va del tema.
 
 Hay **una fila por cada correo** encontrado (los correos no se repiten en todo el
-fichero). El `.xlsx` es cómodo para abrir en Excel/LibreOffice y filtrar.
+fichero). El `.xlsx` es cómodo para abrir en Excel/LibreOffice y **ordenar por
+`relevancia` o filtrar por `tipo_correo`**. Al terminar, el programa imprime un
+resumen con el reparto de correos por tipo y por provincia.
+
+> Consejo: para una lista de contacto en frío, filtra `tipo_correo = genérico` y
+> ordena por `relevancia` de mayor a menor.
 
 ---
 
@@ -152,6 +167,17 @@ campañas de contacto a gran escala, consulta con un profesional.
 
 ---
 
+## Tests
+
+La lógica de extracción (correos, teléfonos, clasificación, relevancia),
+la configuración y el almacenamiento están cubiertos por tests automáticos
+que no necesitan navegador ni internet:
+
+```bash
+pip install -r requirements-dev.txt
+python -m pytest
+```
+
 ## Estructura del proyecto
 
 ```
@@ -159,13 +185,16 @@ electromorito/
 ├── run.py               # lanzador: python run.py
 ├── config.yaml          # QUÉ buscar y CÓMO (edítalo tú)
 ├── requirements.txt     # dependencias
-└── scraper/
-    ├── __main__.py      # python -m scraper
-    ├── config.py        # carga config.yaml y genera las búsquedas
-    ├── search.py        # busca en DuckDuckGo / Bing
-    ├── crawl.py         # visita webs y páginas de contacto
-    ├── extract.py       # extrae y limpia correos y teléfonos
-    ├── storage.py       # guarda CSV + Excel, deduplica y reanuda
-    ├── runner.py        # orquesta todo el proceso
-    └── util.py          # utilidades (dominios, pausas)
+├── requirements-dev.txt # dependencias de test (pytest)
+├── pytest.ini           # configuración de los tests
+├── scraper/
+│   ├── __main__.py      # python -m scraper
+│   ├── config.py        # carga config.yaml y genera las búsquedas
+│   ├── search.py        # busca en DuckDuckGo / Bing
+│   ├── crawl.py         # visita webs y páginas de contacto
+│   ├── extract.py       # extrae correos, teléfonos, clasifica y puntúa
+│   ├── storage.py       # guarda CSV + Excel, deduplica, migra y reanuda
+│   ├── runner.py        # orquesta todo el proceso
+│   └── util.py          # utilidades (dominios, pausas)
+└── tests/               # tests automáticos (pytest)
 ```

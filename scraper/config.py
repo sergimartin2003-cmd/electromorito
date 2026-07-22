@@ -36,6 +36,11 @@ class Config:
     dominios_excluidos: List[str] = field(default_factory=list)
     archivo_salida: str = "resultados"
 
+    # Palabras que indican que la web trata del tema buscado (para puntuar relevancia)
+    palabras_relevancia: List[str] = field(default_factory=list)
+    # Si es True, no guarda organizaciones cuya relevancia sea 0
+    guardar_solo_relevantes: bool = False
+
     # ------------------------------------------------------------------
     @classmethod
     def cargar(cls, ruta: str = "config.yaml") -> "Config":
@@ -66,7 +71,8 @@ class Config:
 
     def _validar(self) -> None:
         # Las listas escritas vacías en YAML quedan como None: las normalizamos.
-        for campo in ("categorias", "ubicaciones", "busquedas_extra", "dominios_excluidos"):
+        for campo in ("categorias", "ubicaciones", "busquedas_extra",
+                      "dominios_excluidos", "palabras_relevancia"):
             valor = getattr(self, campo)
             if valor is None:
                 setattr(self, campo, [])
@@ -90,6 +96,7 @@ class Config:
         self.navegador_visible = _booleano(self.navegador_visible, True)
         self.bloquear_recursos = _booleano(self.bloquear_recursos, True)
         self.respetar_robots = _booleano(self.respetar_robots, True)
+        self.guardar_solo_relevantes = _booleano(self.guardar_solo_relevantes, False)
 
         self.motor_busqueda = str(self.motor_busqueda).strip().lower()
         if self.motor_busqueda not in ("duckduckgo", "bing"):
@@ -107,31 +114,32 @@ class Config:
             )
 
     # ------------------------------------------------------------------
-    def construir_busquedas(self) -> List[Tuple[str, str]]:
-        """Genera la lista de (categoría, texto_de_búsqueda) a partir de la configuración.
+    def construir_busquedas(self) -> List[Tuple[str, str, str]]:
+        """Genera la lista de (categoría, provincia, texto_de_búsqueda).
 
-        Combina cada categoría con cada ubicación, y añade las búsquedas extra.
+        Combina cada categoría con cada ubicación, y añade las búsquedas extra
+        (con provincia vacía).
         """
-        pares: List[Tuple[str, str]] = []
+        pares: List[Tuple[str, str, str]] = []
         vistas = set()
 
-        def _add(categoria: str, consulta: str) -> None:
+        def _add(categoria: str, provincia: str, consulta: str) -> None:
             consulta = " ".join(consulta.split())
             clave = consulta.lower()
             if consulta and clave not in vistas:
                 vistas.add(clave)
-                pares.append((categoria, consulta))
+                pares.append((categoria, provincia, consulta))
 
         if self.ubicaciones:
             for categoria in self.categorias:
                 for ubicacion in self.ubicaciones:
-                    _add(categoria, f"{categoria} {ubicacion}")
+                    _add(categoria, ubicacion, f"{categoria} {ubicacion}")
         else:
             for categoria in self.categorias:
-                _add(categoria, categoria)
+                _add(categoria, "", categoria)
 
         for consulta in self.busquedas_extra:
-            _add("extra", consulta)
+            _add("extra", "", consulta)
 
         if self.max_busquedas and self.max_busquedas > 0:
             pares = pares[: self.max_busquedas]

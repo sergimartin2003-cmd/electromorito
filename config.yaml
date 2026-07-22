@@ -100,6 +100,32 @@ dominios_excluidos:
   - paginasamarillas.es
   - infojobs.net
 
+# --- Relevancia (para descartar resultados que no van del tema) -------
+# Se cuenta cuántas de estas palabras aparecen en cada web: cuantas más,
+# más probable es que sea una organización del sector que buscas.
+palabras_relevancia:
+  - discapacidad
+  - diversidad funcional
+  - educación especial
+  - inclusión
+  - inclusiva
+  - autismo
+  - TEA
+  - fundación
+  - asociación
+  - PFI
+  - IFE
+  - formación e inserción
+  - itinerario formativo
+  - alumnos
+  - alumnado
+  - centro ocupacional
+
+# Si es true, NO guarda las webs cuya relevancia sea 0 (ninguna palabra encontrada)
+guardar_solo_relevantes: false
+
 # --- Salida -----------------------------------------------------------
 # Se generan  <archivo_salida>.csv  y  <archivo_salida>.xlsx
+# Columnas: nombre, correo, tipo_correo, telefonos, provincia, categoria,
+#           relevancia, web, dominio, busqueda, fecha
 archivo_salida: resultados

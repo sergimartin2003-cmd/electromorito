@@ -8,7 +8,7 @@ import urllib.robotparser
 from typing import Dict, List, Optional
 
 from .config import Config
-from .extract import extraer_correos, extraer_telefonos, limpiar_nombre
+from .extract import calcular_relevancia, extraer_correos, extraer_telefonos, limpiar_nombre
 from .util import dominio, dominio_registrable, espera_aleatoria
 
 # Palabras que sugieren que un enlace lleva a información de contacto/legal
@@ -81,13 +81,19 @@ def robots_permite(url: str, config: Config) -> bool:
         return True
 
 
-def _abrir(page, url: str, config: Config) -> bool:
-    try:
-        page.goto(url, timeout=config.timeout_segundos * 1000, wait_until="domcontentloaded")
-        page.wait_for_timeout(1200)  # deja que el JS inserte correos si los oculta
-        return True
-    except Exception:
-        return False
+def _abrir(page, url: str, config: Config, reintentos: int = 0) -> bool:
+    for intento in range(reintentos + 1):
+        try:
+            page.goto(url, timeout=config.timeout_segundos * 1000, wait_until="domcontentloaded")
+            page.wait_for_timeout(1200)  # deja que el JS inserte correos si los oculta
+            return True
+        except Exception:
+            if intento < reintentos:
+                try:
+                    page.wait_for_timeout(1500)  # espera breve antes de reintentar
+                except Exception:
+                    pass
+    return False
 
 
 def _texto_y_html(page) -> str:
@@ -166,9 +172,11 @@ def _enlaces_contacto(page, base_url: str) -> List[str]:
     return encontrados
 
 
-def analizar_web(page, url: str, config: Config, categoria: str, busqueda: str) -> Optional[dict]:
+def analizar_web(
+    page, url: str, config: Config, categoria: str, provincia: str, busqueda: str
+) -> Optional[dict]:
     """Visita `url` (y sus páginas de contacto) y devuelve un dict con los datos, o None si falla."""
-    if not _abrir(page, url, config):
+    if not _abrir(page, url, config, reintentos=1):
         return None
 
     contenido = [_texto_y_html(page)]
@@ -188,11 +196,14 @@ def analizar_web(page, url: str, config: Config, categoria: str, busqueda: str) 
     texto = "\n".join(contenido)
     correos = extraer_correos(texto, mailtos)
     telefonos = extraer_telefonos(texto, tels_href)
+    relevancia = calcular_relevancia(texto, config.palabras_relevancia)
 
     return {
         "nombre": nombre,
         "correos": correos,
         "telefonos": telefonos,
+        "provincia": provincia,
+        "relevancia": relevancia,
         "web": web_final,
         "dominio": dominio_registrable(web_final),
         "categoria": categoria,

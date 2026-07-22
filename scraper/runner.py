@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import sys
-from typing import List
+from typing import Dict, List
 
 from .config import Config
 from .crawl import _USER_AGENT, analizar_web, robots_permite
@@ -123,7 +123,7 @@ def ejecutar(config: Config) -> None:
         page = contexto.new_page()
 
         try:
-            for i, (categoria, consulta) in enumerate(consultas, start=1):
+            for i, (categoria, provincia, consulta) in enumerate(consultas, start=1):
                 _log(f"[{i}/{len(consultas)}] Buscando: '{consulta}'")
                 try:
                     urls = _filtrar_urls(buscar(page, consulta, config), config)
@@ -142,23 +142,29 @@ def ejecutar(config: Config) -> None:
                         continue
 
                     try:
-                        org = analizar_web(page, url, config, categoria, consulta)
+                        org = analizar_web(page, url, config, categoria, provincia, consulta)
                     except Exception as e:  # noqa: BLE001
                         _log(f"    · error al visitar {dom}: {e}")
                         almacen.dominios_vistos.add(dom)
                         org = None
 
                     if org:
-                        nuevos = almacen.guardar_organizacion(org)
-                        total_orgs += 1
-                        n_correos = len(org.get("correos") or [])
-                        etiqueta = org.get("nombre") or dom
-                        if n_correos:
-                            _log(f"    ✓ {etiqueta[:50]} — {n_correos} correo(s), +{nuevos} nuevo(s)")
-                        elif org.get("telefonos"):
-                            _log(f"    ~ {etiqueta[:50]} — sin correo, teléfono guardado")
+                        # Filtro opcional: descarta webs sin ninguna señal del tema buscado
+                        if config.guardar_solo_relevantes and org.get("relevancia", 0) == 0:
+                            almacen.dominios_vistos.add(dom)
+                            _log(f"    · {(org.get('nombre') or dom)[:50]} — sin relevancia, descartada")
                         else:
-                            _log(f"    · {etiqueta[:50]} — sin datos de contacto")
+                            nuevos = almacen.guardar_organizacion(org)
+                            total_orgs += 1
+                            n_correos = len(org.get("correos") or [])
+                            rel = org.get("relevancia", 0)
+                            etiqueta = org.get("nombre") or dom
+                            if n_correos:
+                                _log(f"    ✓ {etiqueta[:50]} — {n_correos} correo(s), +{nuevos} nuevo(s) [rel:{rel}]")
+                            elif org.get("telefonos"):
+                                _log(f"    ~ {etiqueta[:50]} — sin correo, teléfono guardado [rel:{rel}]")
+                            else:
+                                _log(f"    · {etiqueta[:50]} — sin datos de contacto")
 
                     espera_aleatoria(config.espera_min_segundos, config.espera_max_segundos)
 
@@ -178,4 +184,29 @@ def ejecutar(config: Config) -> None:
     if almacen.exportar_excel():
         _log(f"       Excel generado:             {almacen.ruta_xlsx}")
     _log(f"       CSV:                        {almacen.ruta_csv}")
+    _resumen(almacen)
     _log("=" * 64)
+
+
+def _resumen(almacen) -> None:
+    """Imprime un pequeño desglose de los contactos recogidos."""
+    filas = [f for f in almacen.filas if (f.get("correo") or "").strip()]
+    if not filas:
+        return
+
+    def _cuenta(campo: str):
+        conteo: Dict[str, int] = {}
+        for f in filas:
+            clave = (f.get(campo) or "—").strip() or "—"
+            conteo[clave] = conteo.get(clave, 0) + 1
+        return sorted(conteo.items(), key=lambda x: x[1], reverse=True)
+
+    _log("\n  Desglose de correos:")
+    _log("    Por tipo de correo:")
+    for clave, n in _cuenta("tipo_correo"):
+        _log(f"      - {clave or '—':12} {n}")
+    provincias = _cuenta("provincia")
+    if provincias:
+        _log("    Por provincia (top 10):")
+        for clave, n in provincias[:10]:
+            _log(f"      - {clave:22} {n}")

@@ -12,7 +12,12 @@ import datetime as _dt
 import os
 from typing import Dict, List, Set
 
-CAMPOS = ["nombre", "correo", "telefonos", "web", "dominio", "categoria", "busqueda", "fecha"]
+from .extract import clasificar_correo
+
+CAMPOS = [
+    "nombre", "correo", "tipo_correo", "telefonos", "provincia",
+    "categoria", "relevancia", "web", "dominio", "busqueda", "fecha",
+]
 
 
 class Almacen:
@@ -30,20 +35,41 @@ class Almacen:
 
     # ------------------------------------------------------------------
     def _cargar_existente(self) -> None:
-        """Rellena los conjuntos de 'ya vistos' desde ficheros previos (para reanudar)."""
+        """Rellena los conjuntos de 'ya vistos' desde ficheros previos (para reanudar).
+
+        Si el CSV existente tiene columnas de una versión anterior, lo migra
+        automáticamente al formato actual (conservando los datos).
+        """
         if os.path.exists(self.ruta_csv):
+            cabecera_antigua = False
             try:
                 with open(self.ruta_csv, "r", encoding="utf-8-sig", newline="") as f:
-                    for fila in csv.DictReader(f):
-                        self.filas.append(fila)
-                        correo = (fila.get("correo") or "").strip().lower()
+                    lector = csv.DictReader(f)
+                    if lector.fieldnames and list(lector.fieldnames) != CAMPOS:
+                        cabecera_antigua = True
+                    for fila in lector:
+                        # Normaliza cada fila al esquema actual (rellena columnas nuevas)
+                        normal = {campo: (fila.get(campo) or "") for campo in CAMPOS}
+                        self.filas.append(normal)
+                        correo = normal["correo"].strip().lower()
                         if correo:
                             self.correos_vistos.add(correo)
-                        dom = (fila.get("dominio") or "").strip().lower()
+                        dom = normal["dominio"].strip().lower()
                         if dom:
                             self.dominios_vistos.add(dom)
             except Exception as e:  # noqa: BLE001
                 print(f"  Aviso: no se pudo leer el CSV existente ({e}).")
+
+            # Reescribe el fichero con el esquema nuevo si venía de una versión anterior
+            if cabecera_antigua and self.filas:
+                try:
+                    with open(self.ruta_csv, "w", encoding="utf-8-sig", newline="") as f:
+                        writer = csv.DictWriter(f, fieldnames=CAMPOS)
+                        writer.writeheader()
+                        writer.writerows(self.filas)
+                    print("  (CSV existente migrado al nuevo formato de columnas.)")
+                except Exception:
+                    pass
 
         if os.path.exists(self.ruta_estado):
             try:
@@ -90,9 +116,11 @@ class Almacen:
         base = {
             "nombre": org.get("nombre", ""),
             "telefonos": telefonos,
+            "provincia": org.get("provincia", ""),
+            "categoria": org.get("categoria", ""),
+            "relevancia": str(org.get("relevancia", "")),
             "web": org.get("web", ""),
             "dominio": dom,
-            "categoria": org.get("categoria", ""),
             "busqueda": org.get("busqueda", ""),
             "fecha": fecha,
         }
@@ -103,11 +131,11 @@ class Almacen:
             if not correo or correo in self.correos_vistos:
                 continue
             self.correos_vistos.add(correo)
-            nuevas.append({**base, "correo": correo})
+            nuevas.append({**base, "correo": correo, "tipo_correo": clasificar_correo(correo)})
 
         # Sin correos pero con teléfono -> guarda igualmente el contacto (una vez por dominio)
         if not org.get("correos") and telefonos:
-            nuevas.append({**base, "correo": ""})
+            nuevas.append({**base, "correo": "", "tipo_correo": ""})
 
         if nuevas:
             self.filas.extend(nuevas)

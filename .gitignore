@@ -4,6 +4,7 @@ venv/
 env/
 __pycache__/
 *.pyc
+.pytest_cache/
 
 # Resultados generados por el scraper
 resultados.csv
