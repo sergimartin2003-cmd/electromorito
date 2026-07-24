@@ -67,6 +67,9 @@ class Config:
     horizonte_anios: int = 10
     # Escenario de estrés: % de bajada de alquiler para una rentabilidad "pesimista".
     estres_alquiler_pct: float = 0.0
+    # IA opcional (API de Claude) para estimar el alquiler y detectar riesgos.
+    usar_ia: bool = False
+    modelo_ia: str = "claude-opus-4-8"
 
     # Lista de buscadores a usar (derivada de motor_busqueda; no se edita a mano)
     motores: List[str] = field(default_factory=list)
@@ -142,6 +145,8 @@ class Config:
         self.revalorizacion_anual = _decimal(self.revalorizacion_anual, 0.0, minimo=0.0)
         self.horizonte_anios = _entero(self.horizonte_anios, 10, minimo=1)
         self.estres_alquiler_pct = _decimal(self.estres_alquiler_pct, 0.0, minimo=0.0)
+        self.usar_ia = _booleano(self.usar_ia, False)
+        self.modelo_ia = str(self.modelo_ia or "claude-opus-4-8").strip() or "claude-opus-4-8"
         if self.rentas_zona is None or not isinstance(self.rentas_zona, dict):
             self.rentas_zona = {}
         else:

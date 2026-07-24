@@ -34,7 +34,8 @@ CAMPOS_PISOS = [
     "rentabilidad_bruta", "rentabilidad_neta", "rentabilidad_neta_estres", "per",
     "roi_proyectado_pct", "roi_anual_medio_pct", "ganancia_capital", "clasificacion",
     "cuota_hipoteca", "cash_flow_mensual", "rentabilidad_fondos_propios",
-    "fondos_propios", "puntuacion", "duplicado", "url", "fecha",
+    "fondos_propios", "puntuacion", "ia_resumen", "ia_riesgos", "ia_confianza",
+    "duplicado", "url", "fecha",
 ]
 
 
@@ -196,6 +197,7 @@ _COLS_HIPOTECA = [
     ("cuota_hipoteca", "Cuota/mes"), ("cash_flow_mensual", "Cash-flow/mes"),
     ("rentabilidad_fondos_propios", "Rent. s/ fondos"),
 ]
+_COLS_IA = [("ia_riesgos", "Riesgos (IA)")]
 _COLS_FIN = [("url", "Anuncio")]
 _COLS_NUM = [
     "puntuacion", "precio", "superficie", "precio_m2", "mediana_zona_m2",
@@ -211,10 +213,12 @@ def generar_informe_pisos(pisos: List[dict], ruta_html: str) -> str:
     con_hipoteca = any(p.get("cuota_hipoteca") is not None for p in pisos)
     con_estres = any(p.get("rentabilidad_neta_estres") is not None for p in pisos)
     con_proy = any(p.get("roi_anual_medio_pct") is not None for p in pisos)
+    con_ia = any((p.get("ia_riesgos") or p.get("ia_resumen")) for p in pisos)
     cols = (_COLS_BASE
             + (_COLS_ESTRES if con_estres else [])
             + (_COLS_PROY if con_proy else [])
             + (_COLS_HIPOTECA if con_hipoteca else [])
+            + (_COLS_IA if con_ia else [])
             + _COLS_FIN)
 
     datos = json.dumps(pisos, ensure_ascii=False).replace("</", "<\\/")
@@ -241,6 +245,15 @@ def ejecutar_pisos(config, ruta_entrada: str) -> Optional[int]:
         return 0
 
     params = parametros_desde_config(config)
+
+    if getattr(config, "usar_ia", False):
+        from .ia import enriquecer_pisos
+        modelo = getattr(config, "modelo_ia", "claude-opus-4-8")
+        print(f"  Enriqueciendo con IA (modelo {modelo}) los pisos sin alquiler…")
+        n_ia = enriquecer_pisos(filas, params, modelo=modelo)
+        if n_ia:
+            print(f"  IA: {n_ia} piso(s) con alquiler/estado estimado por IA.")
+
     pisos = procesar_pisos(filas, params)
 
     base = config.archivo_salida + "_pisos"
@@ -349,6 +362,7 @@ _PLANTILLA = r"""<!doctype html>
   .tile .k { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.03em; }
   .tile .val { font-size:20px; font-weight:800; font-variant-numeric:tabular-nums; margin-top:2px; }
   tr.dup td { opacity:.5; font-style:italic; }
+  .riesgo { display:inline-block; white-space:normal; max-width:280px; color:var(--cor); font-size:13px; }
 </style>
 </head>
 <body>
@@ -445,6 +459,11 @@ function celda(col, fila) {
     if (!v) return "";
     const cls = (v === "a reformar") ? "e-reformar" : "e-ok";
     return `<span class="pill ${cls}">${esc(v)}</span>`;
+  }
+  if (col === "ia_riesgos") {
+    const t = fila.ia_resumen ? ` title="${esc(fila.ia_resumen)}"` : "";
+    if (v) return `<span class="riesgo"${t}>${esc(v)}</span>`;
+    return fila.ia_resumen ? `<span class="est"${t}>ℹ︎ resumen</span>` : "";
   }
   if (col === "clasificacion") {
     const cls = "c-" + esc(v || "sin").split(" ")[0];

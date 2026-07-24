@@ -135,6 +135,7 @@ Opciones disponibles:
 | `--contactos` | No rastrea: genera la lista depurada de contactos desde el CSV. |
 | `--desde-urls ARCHIVO` | No busca: extrae los contactos de una lista de URLs (una por línea). |
 | `--pisos ARCHIVO` | No rastrea: calcula la **rentabilidad** de los pisos de un CSV/JSON y genera un panel ordenado (ver más abajo). |
+| `--ia` | Con `--pisos`: usa la **IA** (API de Claude) para estimar el alquiler y detectar riesgos en los pisos sin alquiler. |
 | `--navegador RUTA` | Usa un Chrome/Chromium ya instalado (si no usas `playwright install`). |
 | `-c ARCHIVO` | Usa otro archivo de configuración. |
 
@@ -278,6 +279,27 @@ simplificada y conservadora (ignora la amortización del principal y los costes 
 p. ej. anunciado en varios portales), se detecta y se conserva solo el mejor; el panel
 los oculta por defecto (hay una casilla para mostrarlos).
 
+### Estimación con IA (opcional)
+
+Cuando un anuncio de venta **no trae el alquiler**, en vez de estimarlo solo por la
+tabla de zona puedes pedirle a **Claude** que lo estime a partir de la zona, los metros,
+las habitaciones y la descripción, y que además **detecte riesgos** (ocupado, derramas o
+reforma integral pendiente, planta baja o sin ascensor, precio sospechoso…). El panel
+añade entonces una columna **«Riesgos (IA)»** (con el resumen al pasar el ratón).
+
+Es **opcional** y con **degradación elegante**: si no está instalado el SDK o no hay
+clave, no falla — se usa la estimación por zona de siempre. Para activarla:
+
+```bash
+pip install -r requirements-ia.txt
+export ANTHROPIC_API_KEY=...        # o bien:  ant auth login
+python run.py --pisos pisos_ejemplo.csv --ia
+```
+
+O de forma permanente en `config.yaml` con `usar_ia: true`. Solo se llama a la IA para
+los pisos sin alquiler indicado (para acotar el coste); el modelo se configura con
+`modelo_ia` (por defecto `claude-opus-4-8`).
+
 **Con hipoteca (apalancamiento).** Si en `config.yaml` pones `financiacion_pct > 0`,
 además se calcula, para cada piso:
 
@@ -397,6 +419,7 @@ electromorito/
 │   ├── contactos.py     # lista depurada (una fila por organización) para envío
 │   ├── rentabilidad.py  # motor de rentabilidad de pisos (parsers + cálculo)
 │   ├── pisos.py         # modo --pisos: filtra/ordena pisos y genera su panel HTML
+│   ├── ia.py            # enriquecimiento opcional con IA (API de Claude)
 │   ├── runner.py        # orquesta todo el proceso
 │   └── util.py          # utilidades (dominios, pausas, DNS, espera adaptativa)
 ├── pisos_ejemplo.csv    # anuncios de ejemplo para  python run.py --pisos

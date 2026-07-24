@@ -65,6 +65,11 @@ def main() -> None:
              "genera un panel ordenado que enlaza a cada anuncio.",
     )
     parser.add_argument(
+        "--ia", action="store_true",
+        help="Con --pisos: usa la IA (API de Claude) para estimar el alquiler y detectar "
+             "riesgos en los pisos que no traen alquiler.",
+    )
+    parser.add_argument(
         "--navegador", default=None, metavar="RUTA",
         help="Ruta a un Chrome/Chromium ya instalado (si no usas 'playwright install').",
     )
@@ -84,6 +89,8 @@ def main() -> None:
         config.ruta_navegador = args.navegador
 
     if args.pisos:
+        if args.ia:
+            config.usar_ia = True
         from .pisos import ejecutar_pisos
         ejecutar_pisos(config, args.pisos)
         return

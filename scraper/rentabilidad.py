@@ -455,7 +455,8 @@ def evaluar_piso(fila: dict, params: ParametrosRentabilidad) -> dict:
     zona = (fila.get("zona") or fila.get("municipio") or fila.get("provincia") or "").strip()
 
     alquiler = _a_numero(fila.get("alquiler_mensual"))
-    estimado = False
+    # Un alquiler que venga ya marcado como estimado (p. ej. estimado por IA) se respeta.
+    estimado = bool(alquiler) and _a_booleano(fila.get("alquiler_estimado")) is True
     if not alquiler:
         alquiler = estimar_alquiler(superficie, zona, params)
         estimado = alquiler is not None
@@ -512,5 +513,8 @@ def evaluar_piso(fila: dict, params: ParametrosRentabilidad) -> dict:
         "rentabilidad_fondos_propios": apalancamiento.get("rentabilidad_fondos_propios"),
         "fondos_propios": apalancamiento.get("fondos_propios"),
         "puntuacion": None,        # lo rellena el orquestador (depende del descuento de zona)
+        "ia_resumen": (fila.get("ia_resumen") or "").strip(),
+        "ia_riesgos": (fila.get("ia_riesgos") or "").strip(),
+        "ia_confianza": (fila.get("ia_confianza") or "").strip(),
         "completo": neta is not None,
     }

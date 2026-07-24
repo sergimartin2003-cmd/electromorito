@@ -1,0 +1,6 @@
+# Dependencia OPCIONAL para el enriquecimiento con IA del modo --pisos.
+# Solo hace falta si activas la IA (usar_ia: true en config.yaml, o la opción --ia).
+#   pip install -r requirements-ia.txt
+# y luego una clave de la API de Claude:
+#   export ANTHROPIC_API_KEY=...        (o bien: ant auth login)
+anthropic>=0.40
