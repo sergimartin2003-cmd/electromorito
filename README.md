@@ -213,7 +213,8 @@ vuelta a cada anuncio** (así "mandas a la gente a la web" del portal original).
 > (un export, una lista de anuncios, una API con la que tengas permiso…). Los
 > grandes portales inmobiliarios (idealista, Habitaclia, Fotocasa…) **prohíben el
 > scraping** en sus condiciones y lo bloquean activamente; consíguelo por una vía
-> con la que tengas derecho. Ver [Uso responsable y legal](#uso-responsable-y-legal).
+> con la que tengas derecho. Ver [Uso responsable y legal](#uso-responsable-y-legal)
+> y, para las fuentes legales y la arquitectura, **[docs/fuentes_de_datos.md](docs/fuentes_de_datos.md)**.
 
 ### Cómo se usa
 
@@ -436,6 +437,7 @@ electromorito/
 │   ├── pisos.py         # modo --pisos: filtra/ordena pisos y genera su panel HTML
 │   ├── ia.py            # enriquecimiento opcional con IA (API de Claude)
 │   ├── web.py           # interfaz web local del modo --pisos (--web)
+│   ├── fuentes.py       # interfaz de fuentes de datos (API/feeds) + normalizador
 │   ├── runner.py        # orquesta todo el proceso
 │   └── util.py          # utilidades (dominios, pausas, DNS, espera adaptativa)
 ├── pisos_ejemplo.csv    # anuncios de ejemplo para  python run.py --pisos
