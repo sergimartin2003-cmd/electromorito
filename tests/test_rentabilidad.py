@@ -341,6 +341,18 @@ def test_irpf_desactivado_es_none():
     assert rentabilidad_neta_despues_impuestos(180000, 900, p) is None
 
 
+def test_irpf_con_hipoteca_deduce_intereses():
+    from scraper.rentabilidad import rentabilidad_neta_despues_impuestos
+    sin_hip = ParametrosRentabilidad(gastos_pct=0.25, costes_compra_pct=0.11,
+                                     tipo_irpf=0.30, reduccion_irpf=0.60)
+    con_hip = ParametrosRentabilidad(gastos_pct=0.25, costes_compra_pct=0.11,
+                                     tipo_irpf=0.30, reduccion_irpf=0.60,
+                                     financiacion_pct=0.70, interes_hipoteca=0.03)
+    # Los intereses deducibles bajan la factura fiscal => mejor rentabilidad tras IRPF
+    assert (rentabilidad_neta_despues_impuestos(180000, 900, con_hip)
+            > rentabilidad_neta_despues_impuestos(180000, 900, sin_hip))
+
+
 def test_evaluar_piso_cumple_objetivo():
     p = ParametrosRentabilidad(gastos_pct=0.25, costes_compra_pct=0.11, rentabilidad_objetivo=7)
     barato = evaluar_piso({"titulo": "Barato", "zona": "Sevilla", "precio": "100000",

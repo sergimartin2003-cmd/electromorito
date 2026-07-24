@@ -403,16 +403,23 @@ def rentabilidad_neta_despues_impuestos(precio: Optional[float],
                                         params: ParametrosRentabilidad) -> Optional[float]:
     """Rentabilidad neta anual (%) tras IRPF, o None si no está activado o faltan datos.
 
-    Aplica la reducción del rendimiento neto por alquiler de vivienda habitual
-    (`reduccion_irpf`, 60 % por defecto) y el tipo marginal (`tipo_irpf`). Es una
-    aproximación: usa el rendimiento neto de explotación como base y no considera
-    deducciones adicionales (intereses, amortización del inmueble…).
+    Sobre el rendimiento neto del alquiler descuenta los **intereses de la hipoteca**
+    (gasto deducible; se aproxima el primer año como capital × interés), aplica la
+    **reducción** por alquiler de vivienda habitual (`reduccion_irpf`, 60 % por defecto)
+    y el **tipo marginal** (`tipo_irpf`). Sigue siendo una aproximación (no incluye la
+    amortización del inmueble ni otras deducciones), pero refleja que apalancarse baja la
+    factura fiscal. El impuesto nunca es negativo (una pérdida fiscal se cuenta como 0).
     """
     if (not precio or precio <= 0 or not alquiler_mensual or alquiler_mensual <= 0
             or not params.tipo_irpf or params.tipo_irpf <= 0):
         return None
     rendimiento_neto = alquiler_mensual * 12 * (1 - params.gastos_pct)
-    base_imponible = rendimiento_neto * (1 - params.reduccion_irpf)
+
+    intereses = 0.0
+    if params.financiacion_pct and params.financiacion_pct > 0:
+        intereses = precio * params.financiacion_pct * params.interes_hipoteca  # ~1er año
+
+    base_imponible = max(0.0, rendimiento_neto - intereses) * (1 - params.reduccion_irpf)
     impuesto = base_imponible * params.tipo_irpf
     coste_total = precio * (1 + params.costes_compra_pct)
     if coste_total <= 0:
