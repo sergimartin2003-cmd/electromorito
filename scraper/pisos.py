@@ -532,6 +532,8 @@ _PLANTILLA = r"""<!doctype html>
                    margin-top:8px; color:var(--muted); font-size:12px; }
   .mapa .leyenda .sw { display:inline-block; width:10px; height:10px; border-radius:50%;
                        margin-right:4px; vertical-align:middle; }
+  .mapa .mapactrl { font-size:12px; color:var(--muted); margin-bottom:8px; }
+  .mapa .mapactrl select { padding:4px 8px; font-size:12px; }
   .tiles { display:flex; flex-wrap:wrap; gap:12px; padding:14px 22px 0; }
   .tile { background:var(--card); border:1px solid var(--bd); border-radius:10px;
           padding:10px 14px; min-width:120px; }
@@ -582,6 +584,7 @@ const DATOS = /*__DATOS__*/null;
 const COLS = /*__COLS__*/null;
 const NUM = new Set(/*__NUMCOLS__*/null);
 let orden = {col:"puntuacion", dir:-1};
+let metricaMapa = "neta";
 
 const $ = s => document.querySelector(s);
 const esc = s => (s==null?"":String(s)).replace(/[&<>"]/g, c => (
@@ -759,18 +762,58 @@ function svgDispersion(filas) {
   return s + `</svg>`;
 }
 
+const _media = a => a.length ? a.reduce((x,y)=>x+y,0)/a.length : null;
+const _sw = (c,t) => `<span><span class="sw" style="background:${c}"></span>${t}</span>`;
+
 function svgMapa(filas) {
   const grupos = {};
   filas.forEach(r => {
-    if (r.lat==null || r.lon==null || r.rentabilidad_neta==null) return;
+    if (r.lat==null || r.lon==null) return;
     const k = r.zona_mapa || r.zona || "";
-    const g = grupos[k] || (grupos[k] = {n:0, suma:0, chollos:0, lat:r.lat, lon:r.lon, clave:k});
-    g.n++; g.suma += Number(r.rentabilidad_neta); if (r.es_chollo) g.chollos++;
+    const g = grupos[k] || (grupos[k] = {n:0, chollos:0, lat:r.lat, lon:r.lon, clave:k,
+      neta:[], m2:[], cf:[], precio:[]});
+    g.n++; if (r.es_chollo) g.chollos++;
+    if (r.rentabilidad_neta!=null) g.neta.push(Number(r.rentabilidad_neta));
+    if (r.precio_m2!=null) g.m2.push(Number(r.precio_m2));
+    if (r.cash_flow_mensual!=null) g.cf.push(Number(r.cash_flow_mensual));
+    if (r.precio!=null) g.precio.push(Number(r.precio));
   });
   const lista = Object.values(grupos);
   if (!lista.length)
-    return `<div class="grafico mapa"><h3>Mapa de rentabilidad por zona</h3>` +
+    return `<div class="grafico mapa"><h3>Mapa por zona</h3>` +
            `<p class="est">No hay pisos geolocalizables (zonas no reconocidas).</p></div>`;
+
+  // Métricas disponibles y la activa
+  const conCf = lista.some(g => g.cf.length);
+  const opciones = [["neta","Rentabilidad neta"]];
+  if (conCf) opciones.push(["cf","Cash-flow/mes"]);
+  opciones.push(["m2","€/m²"], ["precio","Precio medio"]);
+  const metrica = opciones.some(([v]) => v===metricaMapa) ? metricaMapa : "neta";
+  const campo = {neta:"neta", cf:"cf", m2:"m2", precio:"precio"}[metrica];
+  const valor = g => _media(g[campo]);
+
+  // Escala de color según el tipo de métrica
+  const OP = [0.35,0.55,0.72,0.9];
+  let colorDe, leyenda, fmt;
+  if (metrica === "neta") {
+    fmt = fmtPct;
+    colorDe = v => `fill="var(${v>=8?"--exc":v>=6?"--bue":v>=4?"--cor":"--baj"})" fill-opacity="0.8"`;
+    leyenda = _sw("var(--exc)","≥8 %")+_sw("var(--bue)","≥6 %")+_sw("var(--cor)","≥4 %")+_sw("var(--baj)","&lt;4 %");
+  } else if (metrica === "cf") {
+    fmt = v => fmtEur(Math.round(v))+"/mes";
+    colorDe = v => `fill="var(${v<0?"--baj":v<100?"--cor":"--exc"})" fill-opacity="0.8"`;
+    leyenda = _sw("var(--baj)","negativo")+_sw("var(--cor)","0–100 €")+_sw("var(--exc)","≥100 €");
+  } else {  // secuencial (€/m² o precio): un solo tono (--acc) por opacidad
+    fmt = v => fmtEur(Math.round(v));
+    const vals = lista.map(valor).filter(v => v!=null);
+    const min = Math.min(...vals), max = Math.max(...vals), rng = (max-min)||1;
+    const bin = v => Math.max(0, Math.min(3, Math.floor((v-min)/rng*4 - 1e-9)));
+    colorDe = v => `fill="var(--acc)" fill-opacity="${OP[bin(v)]}"`;
+    const corte = i => min + rng*i/4;
+    leyenda = [0,1,2,3].map(i =>
+      `<span><span class="sw" style="background:var(--acc);opacity:${OP[i]}"></span>`+
+      `${fmt(corte(i))}${i<3?"–"+fmt(corte(i+1)):"+"}</span>`).join("");
+  }
 
   const M = {lonMin:-9.5, lonMax:4.5, latMin:35.7, latMax:44.0}, COS = Math.cos(40*Math.PI/180);
   const W = 460, pad = 12, H = Math.round(W*(M.latMax-M.latMin)/((M.lonMax-M.lonMin)*COS));
@@ -786,9 +829,8 @@ function svgMapa(filas) {
     [-3.50,36.70],[-4.42,36.55],[-5.35,36.15],[-5.61,36.01],[-6.29,36.53],[-6.95,37.20],
     [-7.42,37.24],[-7.10,38.02],[-7.01,38.87],[-6.86,40.27],[-6.80,41.03],[-8.20,41.88],
     [-8.87,41.90],[-9.00,42.58],[-8.30,43.20]];
-  const colorNeta = v => v>=8?"--exc":v>=6?"--bue":v>=4?"--cor":"--baj";
 
-  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Mapa de rentabilidad por zona">`;
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Mapa por zona">`;
   s += `<path class="contorno" d="M ${OUTLINE.map(([lo,la]) =>
         mainX(lo).toFixed(1)+" "+mainY(la).toFixed(1)).join(" L ")} Z"/>`;
   [[2.65,39.57],[4.00,39.95],[1.43,38.98]].forEach(([lo,la]) => {
@@ -799,23 +841,25 @@ function svgMapa(filas) {
 
   lista.sort((a,b) => b.n-a.n);
   lista.forEach(g => {
-    const [x,y]=P(g.lon,g.lat), media=g.suma/g.n, r=Math.min(24, 5+Math.sqrt(g.n)*3.2);
-    const info = `${g.clave}: ${g.n} piso(s) · media ${fmtPct(media)}${g.chollos?` · ${g.chollos} 🔥`:""}`;
+    const [x,y]=P(g.lon,g.lat), v=valor(g), r=Math.min(24, 5+Math.sqrt(g.n)*3.2);
+    const netaTxt = _media(g.neta)!=null ? fmtPct(_media(g.neta)) : "—";
+    const info = `${g.clave}: ${g.n} piso(s) · rent. ${netaTxt}`+
+                 (v!=null && metrica!=="neta" ? ` · ${fmt(v)}` : "")+(g.chollos?` · ${g.chollos} 🔥`:"");
+    const fill = v!=null ? colorDe(v) : `fill="var(--muted)" fill-opacity="0.4"`;
     s += `<circle class="burbuja" data-zona="${esc(g.clave)}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" `+
-         `r="${r.toFixed(1)}" fill="var(${colorNeta(media)})" fill-opacity="0.78" stroke="var(--card)" `+
-         `stroke-width="1"><title>${esc(info)}</title></circle>`;
-    if (r>=9) s += `<text x="${x.toFixed(1)}" y="${(y+3).toFixed(1)}" text-anchor="middle" `+
-                   `font-size="9" font-weight="700" fill="#fff" style="pointer-events:none">${g.n}</text>`;
+         `r="${r.toFixed(1)}" ${fill} stroke="var(--card)" stroke-width="1"><title>${esc(info)}</title></circle>`;
+    if (r>=9) s += `<text x="${x.toFixed(1)}" y="${(y+3).toFixed(1)}" text-anchor="middle" font-size="9" `+
+                   `font-weight="700" fill="var(--txt)" stroke="var(--card)" stroke-width="2.5" `+
+                   `paint-order="stroke" style="pointer-events:none">${g.n}</text>`;
   });
   s += `</svg>`;
 
-  const leyenda = `<div class="leyenda">`+
-    `<span><span class="sw" style="background:var(--exc)"></span>≥8 %</span>`+
-    `<span><span class="sw" style="background:var(--bue)"></span>≥6 %</span>`+
-    `<span><span class="sw" style="background:var(--cor)"></span>≥4 %</span>`+
-    `<span><span class="sw" style="background:var(--baj)"></span>&lt;4 %</span>`+
+  const sel = `<div class="mapactrl">Colorear por: <select id="mapaMetrica">`+
+    opciones.map(([v,t]) => `<option value="${v}"${v===metrica?" selected":""}>${t}</option>`).join("")+
+    `</select></div>`;
+  const pie = `<div class="leyenda">${leyenda}`+
     `<span style="margin-left:auto">tamaño = nº de pisos · clic en una zona para filtrar</span></div>`;
-  return `<div class="grafico mapa"><h3>Mapa de rentabilidad por zona (media neta)</h3>${s}${leyenda}</div>`;
+  return `<div class="grafico mapa"><h3>Mapa por zona</h3>${sel}${s}${pie}</div>`;
 }
 
 function dibujar_graficos(filas) {
@@ -881,6 +925,9 @@ function init() {
   $("#graficos").addEventListener("click", e => {
     const b = e.target.closest(".burbuja");
     if (b) { $("#buscar").value = b.getAttribute("data-zona"); pintar(); }
+  });
+  $("#graficos").addEventListener("change", e => {
+    if (e.target.id === "mapaMetrica") { metricaMapa = e.target.value; pintar(); }
   });
   pintar();
 }
