@@ -401,6 +401,15 @@ _PLANTILLA = r"""<!doctype html>
   .p-media { background:var(--cor); }
   .p-baja { background:var(--gra, #94a3b8); }
   .chollo { color:var(--baj); border-color:var(--baj); font-weight:800; }
+  .graficos { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:14px;
+              padding:14px 22px 0; }
+  .grafico { background:var(--card); border:1px solid var(--bd); border-radius:10px; padding:12px 14px; }
+  .grafico h3 { margin:0 0 8px; font-size:12px; font-weight:700; text-transform:uppercase;
+                letter-spacing:.03em; color:var(--muted); }
+  .grafico svg { width:100%; height:auto; display:block; }
+  .grafico .eje { stroke:var(--bd); stroke-width:1; }
+  .grafico .rot { fill:var(--muted); font-size:9px; }
+  .grafico .val { fill:var(--txt); font-size:9px; font-weight:700; }
   .tiles { display:flex; flex-wrap:wrap; gap:12px; padding:14px 22px 0; }
   .tile { background:var(--card); border:1px solid var(--bd); border-radius:10px;
           padding:10px 14px; min-width:120px; }
@@ -420,6 +429,7 @@ _PLANTILLA = r"""<!doctype html>
   Verifica siempre los números antes de decidir.</div>
 </header>
 <div class="tiles" id="tiles"></div>
+<div class="graficos" id="graficos"></div>
 <div class="controles">
   <input type="search" id="buscar" placeholder="Buscar título, zona…">
   <select id="fZona"><option value="">Todas las zonas</option></select>
@@ -584,6 +594,59 @@ function tiles(filas) {
     `<div class="tile"><div class="k">${esc(k)}</div><div class="val">${v}</div></div>`).join("");
 }
 
+function svgBarras(filas) {
+  const orden = [["excelente","--exc"],["buena","--bue"],["correcta","--cor"],["baja","--baj"]];
+  const cuenta = {};
+  filas.forEach(r => { if (r.clasificacion) cuenta[r.clasificacion] = (cuenta[r.clasificacion]||0)+1; });
+  const W=320, H=150, pb=26, pt=16, n=orden.length, bw=42, gap=(W-n*bw)/(n+1);
+  const max = Math.max(1, ...orden.map(([k]) => cuenta[k]||0));
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Pisos por valoración">`;
+  orden.forEach(([k,varc],i) => {
+    const c = cuenta[k]||0, h = (H-pb-pt)*(c/max), x = gap + i*(bw+gap), y = H-pb-h;
+    s += `<rect x="${x}" y="${y.toFixed(1)}" width="${bw}" height="${h.toFixed(1)}" rx="4" fill="var(${varc})"><title>${k}: ${c}</title></rect>`;
+    if (c) s += `<text class="val" x="${x+bw/2}" y="${(y-4).toFixed(1)}" text-anchor="middle">${c}</text>`;
+    s += `<text class="rot" x="${x+bw/2}" y="${H-pb+12}" text-anchor="middle">${k}</text>`;
+  });
+  return s + `<line class="eje" x1="0" y1="${H-pb}" x2="${W}" y2="${H-pb}"/></svg>`;
+}
+
+function svgDispersion(filas) {
+  const pts = filas.filter(r => r.precio && r.rentabilidad_neta!=null)
+    .map(r => ({x:Number(r.precio), y:Number(r.rentabilidad_neta), chollo:r.es_chollo, t:r.titulo||""}));
+  const W=320, H=160, pl=34, pr=8, pt=10, pb=22;
+  if (!pts.length) return `<svg viewBox="0 0 ${W} ${H}"><text class="rot" x="${W/2}" y="${H/2}" text-anchor="middle">Sin datos</text></svg>`;
+  const xs=pts.map(p=>p.x), ys=pts.map(p=>p.y);
+  let xmin=Math.min(...xs), xmax=Math.max(...xs), ymin=Math.min(0,...ys), ymax=Math.max(...ys);
+  if (xmax===xmin) { xmax+=1; xmin-=1; }
+  if (ymax===ymin) { ymax+=1; }
+  const px = x => pl + (W-pl-pr)*((x-xmin)/(xmax-xmin));
+  const py = y => (H-pb) - (H-pb-pt)*((y-ymin)/(ymax-ymin));
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Precio frente a rentabilidad neta">`;
+  s += `<line class="eje" x1="${pl}" y1="${pt}" x2="${pl}" y2="${H-pb}"/>`;
+  s += `<line class="eje" x1="${pl}" y1="${H-pb}" x2="${W-pr}" y2="${H-pb}"/>`;
+  s += `<text class="rot" x="${pl}" y="${H-7}" text-anchor="start">${fmtEur(Math.round(xmin))}</text>`;
+  s += `<text class="rot" x="${W-pr}" y="${H-7}" text-anchor="end">${fmtEur(Math.round(xmax))}</text>`;
+  s += `<text class="rot" x="3" y="${(py(ymax)+3).toFixed(1)}">${fmtNum(ymax)}%</text>`;
+  s += `<text class="rot" x="3" y="${H-pb}">${fmtNum(ymin)}%</text>`;
+  pts.filter(p=>!p.chollo).forEach(p => {
+    s += `<circle cx="${px(p.x).toFixed(1)}" cy="${py(p.y).toFixed(1)}" r="3" fill="var(--acc)" opacity="0.6"><title>${esc(p.t)} — ${fmtEur(p.x)} · ${fmtPct(p.y)}</title></circle>`;
+  });
+  pts.filter(p=>p.chollo).forEach(p => {
+    s += `<circle cx="${px(p.x).toFixed(1)}" cy="${py(p.y).toFixed(1)}" r="5" fill="var(--exc)" stroke="var(--card)" stroke-width="1.5"><title>🔥 ${esc(p.t)} — ${fmtEur(p.x)} · ${fmtPct(p.y)}</title></circle>`;
+  });
+  return s + `</svg>`;
+}
+
+function dibujar_graficos(filas) {
+  const conRent = filas.filter(r => r.completo);
+  const g = $("#graficos");
+  if (!conRent.length) { g.innerHTML = ""; return; }
+  const chollos = conRent.filter(r => r.es_chollo).length;
+  g.innerHTML =
+    `<div class="grafico"><h3>Pisos por valoración</h3>${svgBarras(conRent)}</div>` +
+    `<div class="grafico"><h3>Precio vs. rentabilidad neta${chollos ? " · 🔥 chollo" : ""}</h3>${svgDispersion(conRent)}</div>`;
+}
+
 function pintar() {
   const filas = filtradas();
   $("#cuerpo").innerHTML = filas.map(r =>
@@ -594,6 +657,7 @@ function pintar() {
   ).join("");
   $("#cuenta").textContent = `${filas.length} piso(s)`;
   tiles(filas);
+  dibujar_graficos(filas);
 }
 
 function descargarCsv() {

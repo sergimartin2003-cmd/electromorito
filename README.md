@@ -342,8 +342,9 @@ HTML ordena los pisos por puntuación y permite **filtrar por zona, rentabilidad
 mínima, precio máximo y solo chollos**, ordenar por cualquier columna (puntuación,
 rentabilidad, PER, cash-flow, rentabilidad sobre fondos propios…) y abrir cada anuncio
 en el portal original. Arriba muestra unos **indicadores** (nº de pisos, rentabilidad
-neta media, PER medio, cash-flow medio, nº de chollos) que se **recalculan al filtrar**,
-y un botón para **descargar el CSV ya filtrado**. Las rentabilidades son **estimaciones**
+neta media, PER medio, cash-flow medio, nº de chollos) y dos **gráficos** —«Pisos por
+valoración» y el mapa «Precio vs. rentabilidad neta» con los chollos resaltados— que se
+**recalculan al filtrar**, y un botón para **descargar el CSV ya filtrado**. Las rentabilidades son **estimaciones**
 a partir de los datos del anuncio y de los supuestos configurados: verifícalas antes de decidir.
 
 ---
