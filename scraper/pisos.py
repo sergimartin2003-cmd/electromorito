@@ -126,6 +126,15 @@ def _anotar_zona(pisos: List[dict], params: ParametrosRentabilidad) -> None:
         p["puntuacion"] = puntuacion(p, params)
 
 
+def _geolocalizar(pisos: List[dict]) -> None:
+    """Añade zona_mapa/lat/lon a cada piso emparejando su zona con las coordenadas."""
+    from .coordenadas import coordenada_de
+    for p in pisos:
+        coord = coordenada_de(p.get("zona", ""))
+        if coord:
+            p["zona_mapa"], p["lat"], p["lon"] = coord
+
+
 def _clave_dedup(p: dict) -> Optional[str]:
     """Clave para detectar el mismo piso repetido (misma zona, precio y superficie)."""
     precio, sup = p.get("precio"), p.get("superficie")
@@ -213,6 +222,7 @@ def procesar_pisos(filas: List[dict], params: ParametrosRentabilidad) -> List[di
     """
     evaluados = [evaluar_piso(fila, params) for fila in filas]
     _anotar_zona(evaluados, params)
+    _geolocalizar(evaluados)
 
     def _clave(p: dict):
         # Los que tienen rentabilidad van primero; dentro, por puntuación y luego
@@ -513,6 +523,15 @@ _PLANTILLA = r"""<!doctype html>
   .grafico .eje { stroke:var(--bd); stroke-width:1; }
   .grafico .rot { fill:var(--muted); font-size:9px; }
   .grafico .val { fill:var(--txt); font-size:9px; font-weight:700; }
+  .grafico.mapa { grid-column:1/-1; max-width:640px; margin:0 auto; width:100%; }
+  .mapa .contorno { fill:rgba(127,127,127,.09); stroke:var(--bd); stroke-width:1; }
+  .mapa .inset { fill:none; stroke:var(--bd); stroke-width:1; stroke-dasharray:3 3; }
+  .mapa .burbuja { cursor:pointer; transition:stroke-width .1s; }
+  .mapa .burbuja:hover { stroke:var(--txt); stroke-width:2; }
+  .mapa .leyenda { display:flex; gap:14px; flex-wrap:wrap; align-items:center;
+                   margin-top:8px; color:var(--muted); font-size:12px; }
+  .mapa .leyenda .sw { display:inline-block; width:10px; height:10px; border-radius:50%;
+                       margin-right:4px; vertical-align:middle; }
   .tiles { display:flex; flex-wrap:wrap; gap:12px; padding:14px 22px 0; }
   .tile { background:var(--card); border:1px solid var(--bd); border-radius:10px;
           padding:10px 14px; min-width:120px; }
@@ -740,12 +759,72 @@ function svgDispersion(filas) {
   return s + `</svg>`;
 }
 
+function svgMapa(filas) {
+  const grupos = {};
+  filas.forEach(r => {
+    if (r.lat==null || r.lon==null || r.rentabilidad_neta==null) return;
+    const k = r.zona_mapa || r.zona || "";
+    const g = grupos[k] || (grupos[k] = {n:0, suma:0, chollos:0, lat:r.lat, lon:r.lon, clave:k});
+    g.n++; g.suma += Number(r.rentabilidad_neta); if (r.es_chollo) g.chollos++;
+  });
+  const lista = Object.values(grupos);
+  if (!lista.length)
+    return `<div class="grafico mapa"><h3>Mapa de rentabilidad por zona</h3>` +
+           `<p class="est">No hay pisos geolocalizables (zonas no reconocidas).</p></div>`;
+
+  const M = {lonMin:-9.5, lonMax:4.5, latMin:35.7, latMax:44.0}, COS = Math.cos(40*Math.PI/180);
+  const W = 460, pad = 12, H = Math.round(W*(M.latMax-M.latMin)/((M.lonMax-M.lonMin)*COS));
+  const mainX = lon => pad + (lon-M.lonMin)/(M.lonMax-M.lonMin)*(W-2*pad);
+  const mainY = lat => pad + (M.latMax-lat)/(M.latMax-M.latMin)*(H-2*pad);
+  const ix0=14, iy0=H-70, iw=116, ih=58, C={lonMin:-18.3,lonMax:-13.2,latMin:27.5,latMax:29.6};
+  const canX = lon => ix0 + (lon-C.lonMin)/(C.lonMax-C.lonMin)*iw;
+  const canY = lat => iy0 + (C.latMax-lat)/(C.latMax-C.latMin)*ih;
+  const P = (lon,lat) => lon < -12 ? [canX(lon),canY(lat)] : [mainX(lon),mainY(lat)];
+  const OUTLINE = [[-7.69,43.79],[-5.85,43.65],[-3.80,43.46],[-2.92,43.36],[-1.79,43.38],
+    [-0.30,43.30],[1.43,42.60],[3.32,42.32],[2.17,41.30],[0.86,40.71],[0.00,40.00],
+    [-0.10,39.30],[0.22,38.73],[-0.48,38.35],[-0.72,37.85],[-1.30,37.55],[-2.19,36.72],
+    [-3.50,36.70],[-4.42,36.55],[-5.35,36.15],[-5.61,36.01],[-6.29,36.53],[-6.95,37.20],
+    [-7.42,37.24],[-7.10,38.02],[-7.01,38.87],[-6.86,40.27],[-6.80,41.03],[-8.20,41.88],
+    [-8.87,41.90],[-9.00,42.58],[-8.30,43.20]];
+  const colorNeta = v => v>=8?"--exc":v>=6?"--bue":v>=4?"--cor":"--baj";
+
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Mapa de rentabilidad por zona">`;
+  s += `<path class="contorno" d="M ${OUTLINE.map(([lo,la]) =>
+        mainX(lo).toFixed(1)+" "+mainY(la).toFixed(1)).join(" L ")} Z"/>`;
+  [[2.65,39.57],[4.00,39.95],[1.43,38.98]].forEach(([lo,la]) => {
+    const [x,y]=P(lo,la); s += `<circle class="contorno" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3"/>`;
+  });
+  s += `<rect class="inset" x="${ix0}" y="${iy0}" width="${iw}" height="${ih}" rx="4"/>`;
+  s += `<text class="rot" x="${ix0+4}" y="${iy0+12}">Canarias</text>`;
+
+  lista.sort((a,b) => b.n-a.n);
+  lista.forEach(g => {
+    const [x,y]=P(g.lon,g.lat), media=g.suma/g.n, r=Math.min(24, 5+Math.sqrt(g.n)*3.2);
+    const info = `${g.clave}: ${g.n} piso(s) · media ${fmtPct(media)}${g.chollos?` · ${g.chollos} 🔥`:""}`;
+    s += `<circle class="burbuja" data-zona="${esc(g.clave)}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" `+
+         `r="${r.toFixed(1)}" fill="var(${colorNeta(media)})" fill-opacity="0.78" stroke="var(--card)" `+
+         `stroke-width="1"><title>${esc(info)}</title></circle>`;
+    if (r>=9) s += `<text x="${x.toFixed(1)}" y="${(y+3).toFixed(1)}" text-anchor="middle" `+
+                   `font-size="9" font-weight="700" fill="#fff" style="pointer-events:none">${g.n}</text>`;
+  });
+  s += `</svg>`;
+
+  const leyenda = `<div class="leyenda">`+
+    `<span><span class="sw" style="background:var(--exc)"></span>≥8 %</span>`+
+    `<span><span class="sw" style="background:var(--bue)"></span>≥6 %</span>`+
+    `<span><span class="sw" style="background:var(--cor)"></span>≥4 %</span>`+
+    `<span><span class="sw" style="background:var(--baj)"></span>&lt;4 %</span>`+
+    `<span style="margin-left:auto">tamaño = nº de pisos · clic en una zona para filtrar</span></div>`;
+  return `<div class="grafico mapa"><h3>Mapa de rentabilidad por zona (media neta)</h3>${s}${leyenda}</div>`;
+}
+
 function dibujar_graficos(filas) {
   const conRent = filas.filter(r => r.completo);
   const g = $("#graficos");
   if (!conRent.length) { g.innerHTML = ""; return; }
   const chollos = conRent.filter(r => r.es_chollo).length;
   g.innerHTML =
+    svgMapa(conRent) +
     `<div class="grafico"><h3>Pisos por valoración</h3>${svgBarras(conRent)}</div>` +
     `<div class="grafico"><h3>Precio vs. rentabilidad neta${chollos ? " · 🔥 chollo" : ""}</h3>${svgDispersion(conRent)}</div>`;
 }
@@ -799,6 +878,10 @@ function init() {
     $(s).addEventListener("input", pintar); $(s).addEventListener("change", pintar);
   });
   $("#btnCsv").addEventListener("click", descargarCsv);
+  $("#graficos").addEventListener("click", e => {
+    const b = e.target.closest(".burbuja");
+    if (b) { $("#buscar").value = b.getAttribute("data-zona"); pintar(); }
+  });
   pintar();
 }
 init();

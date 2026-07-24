@@ -359,9 +359,12 @@ HTML ordena los pisos por puntuación y permite **filtrar por zona, rentabilidad
 mínima, precio máximo y solo chollos**, ordenar por cualquier columna (puntuación,
 rentabilidad, PER, cash-flow, rentabilidad sobre fondos propios…) y abrir cada anuncio
 en el portal original. Arriba muestra unos **indicadores** (nº de pisos, rentabilidad
-neta media, PER medio, cash-flow medio, nº de chollos) y dos **gráficos** —«Pisos por
-valoración» y el mapa «Precio vs. rentabilidad neta» con los chollos resaltados— que se
-**recalculan al filtrar**, y un botón para **descargar el CSV ya filtrado**. Las rentabilidades son **estimaciones**
+neta media, PER medio, cash-flow medio, nº de chollos), un **mapa de España** con una
+burbuja por zona (tamaño = nº de pisos, color = rentabilidad neta media; **clic en una
+zona para filtrar**) y dos **gráficos** —«Pisos por valoración» y «Precio vs.
+rentabilidad neta» con los chollos resaltados—. Todo se **recalcula al filtrar**, y hay
+un botón para **descargar el CSV ya filtrado**. El mapa es SVG en línea (sin mapas
+externos): sitúa cada piso por su `zona` con coordenadas de provincias/capitales. Las rentabilidades son **estimaciones**
 a partir de los datos del anuncio y de los supuestos configurados: verifícalas antes de decidir.
 
 ---
@@ -460,6 +463,7 @@ electromorito/
 │   ├── contactos.py     # lista depurada (una fila por organización) para envío
 │   ├── rentabilidad.py  # motor de rentabilidad de pisos (parsers + cálculo)
 │   ├── rentas_referencia.py  # tabla orientativa de €/m²·mes por provincia
+│   ├── coordenadas.py   # coordenadas de provincias/capitales para el mapa
 │   ├── pisos.py         # modo --pisos: filtra/ordena pisos y genera su panel HTML
 │   ├── ia.py            # enriquecimiento opcional con IA (API de Claude)
 │   ├── web.py           # interfaz web local del modo --pisos (--web)
