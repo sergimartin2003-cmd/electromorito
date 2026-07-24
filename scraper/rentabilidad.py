@@ -48,6 +48,11 @@ class ParametrosRentabilidad:
     # Rentabilidad neta objetivo (%). Si > 0, se calcula a qué precio compraría cada
     # piso para alcanzarla (precio objetivo / break-even). 0 = desactivado.
     rentabilidad_objetivo: float = 0.0
+    # IRPF: tipo marginal (0.30 = 30 %) y reducción del rendimiento neto por alquiler de
+    # vivienda habitual (0.60 = 60 %). Con tipo_irpf > 0 se calcula la rentabilidad
+    # neta DESPUÉS de impuestos. 0 = desactivado.
+    tipo_irpf: float = 0.0
+    reduccion_irpf: float = 0.60
 
 
 # --- Lectura de números tolerante (formato español) ----------------------
@@ -393,6 +398,28 @@ def proyeccion(precio: Optional[float], alquiler_mensual: Optional[float],
     }
 
 
+def rentabilidad_neta_despues_impuestos(precio: Optional[float],
+                                        alquiler_mensual: Optional[float],
+                                        params: ParametrosRentabilidad) -> Optional[float]:
+    """Rentabilidad neta anual (%) tras IRPF, o None si no está activado o faltan datos.
+
+    Aplica la reducción del rendimiento neto por alquiler de vivienda habitual
+    (`reduccion_irpf`, 60 % por defecto) y el tipo marginal (`tipo_irpf`). Es una
+    aproximación: usa el rendimiento neto de explotación como base y no considera
+    deducciones adicionales (intereses, amortización del inmueble…).
+    """
+    if (not precio or precio <= 0 or not alquiler_mensual or alquiler_mensual <= 0
+            or not params.tipo_irpf or params.tipo_irpf <= 0):
+        return None
+    rendimiento_neto = alquiler_mensual * 12 * (1 - params.gastos_pct)
+    base_imponible = rendimiento_neto * (1 - params.reduccion_irpf)
+    impuesto = base_imponible * params.tipo_irpf
+    coste_total = precio * (1 + params.costes_compra_pct)
+    if coste_total <= 0:
+        return None
+    return (rendimiento_neto - impuesto) / coste_total * 100
+
+
 def precio_objetivo(alquiler_mensual: Optional[float],
                     rentabilidad_objetivo_pct: float,
                     params: ParametrosRentabilidad) -> Optional[int]:
@@ -503,6 +530,7 @@ def evaluar_piso(fila: dict, params: ParametrosRentabilidad) -> dict:
     neta_estres = rentabilidad_neta_estres(precio, alquiler, params)
     objetivo = precio_objetivo(alquiler, params.rentabilidad_objetivo, params)
     cumple_objetivo = bool(precio and objetivo and precio <= objetivo)
+    neta_impuestos = rentabilidad_neta_despues_impuestos(precio, alquiler, params)
 
     return {
         "titulo": (fila.get("titulo") or fila.get("nombre") or "").strip(),
@@ -526,6 +554,7 @@ def evaluar_piso(fila: dict, params: ParametrosRentabilidad) -> dict:
         "rentabilidad_bruta": round(bruta, 2) if bruta is not None else None,
         "rentabilidad_neta": round(neta, 2) if neta is not None else None,
         "rentabilidad_neta_estres": round(neta_estres, 2) if neta_estres is not None else None,
+        "rentabilidad_neta_impuestos": round(neta_impuestos, 2) if neta_impuestos is not None else None,
         "per": price_to_rent(precio, alquiler),
         "roi_proyectado_pct": proy.get("roi_proyectado_pct"),
         "roi_anual_medio_pct": proy.get("roi_anual_medio_pct"),

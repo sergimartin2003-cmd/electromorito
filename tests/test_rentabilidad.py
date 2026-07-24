@@ -325,6 +325,22 @@ def test_precio_objetivo():
     assert precio_objetivo(None, 7, p) is None
 
 
+def test_rentabilidad_neta_despues_impuestos():
+    from scraper.rentabilidad import rentabilidad_neta_despues_impuestos
+    p = ParametrosRentabilidad(gastos_pct=0.25, costes_compra_pct=0.11,
+                               tipo_irpf=0.30, reduccion_irpf=0.60)
+    # rend. neto 8100; base 8100*0.4=3240; impuesto 972; neto tras IRPF 7128; /199800 => 3,57 %
+    assert round(rentabilidad_neta_despues_impuestos(180000, 900, p), 2) == 3.57
+    # Es menor que la neta pre-impuestos
+    assert rentabilidad_neta_despues_impuestos(180000, 900, p) < rentabilidad_neta(180000, 900, p)
+
+
+def test_irpf_desactivado_es_none():
+    from scraper.rentabilidad import rentabilidad_neta_despues_impuestos
+    p = ParametrosRentabilidad(gastos_pct=0.25, costes_compra_pct=0.11, tipo_irpf=0.0)
+    assert rentabilidad_neta_despues_impuestos(180000, 900, p) is None
+
+
 def test_evaluar_piso_cumple_objetivo():
     p = ParametrosRentabilidad(gastos_pct=0.25, costes_compra_pct=0.11, rentabilidad_objetivo=7)
     barato = evaluar_piso({"titulo": "Barato", "zona": "Sevilla", "precio": "100000",

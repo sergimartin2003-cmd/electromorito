@@ -224,6 +224,12 @@ estres_alquiler_pct: 0.10    # 0.10 = alquiler un 10 % más bajo. 0 = desactivad
 # Muy útil para negociar. En el panel puedes filtrar "solo si cumplen objetivo".
 rentabilidad_objetivo: 7     # % de rentabilidad neta que persigues. 0 = desactivado
 
+# IRPF (opcional). Con tipo_irpf > 0 se calcula la rentabilidad neta DESPUÉS de
+# impuestos, aplicando la reducción del rendimiento neto por alquiler de vivienda
+# habitual (60 % general) y tu tipo marginal de IRPF. Es una aproximación.
+tipo_irpf: 0.30              # tu tipo marginal de IRPF (0.30 = 30 %). 0 = desactivado
+reduccion_irpf: 0.60        # reducción del rendimiento neto (0.60 = 60 %, vivienda habitual)
+
 # Tabla de rentas de referencia integrada (€/m²·mes orientativos por provincia). Se usa
 # para estimar el alquiler cuando la zona no está en tu 'rentas_zona'. Tus valores de
 # 'rentas_zona' siempre mandan. Reemplázala/afínala con datos de SERPAVI. false = no usarla.

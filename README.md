@@ -279,6 +279,12 @@ ella por defecto.
 rentabilidad neta *pesimista* suponiendo el alquiler ese % más bajo: un test de
 resistencia rápido ante bajadas de renta o más vacancia.
 
+**Rentabilidad después de IRPF (opcional).** Con `tipo_irpf > 0` se calcula la
+rentabilidad neta *tras impuestos*, aplicando la **reducción del 60 %** del rendimiento
+neto por alquiler de vivienda habitual (`reduccion_irpf`) y tu **tipo marginal**
+(`tipo_irpf`). Es una aproximación (no incluye deducciones de intereses o amortización),
+pero da una idea realista de lo que queda en el bolsillo.
+
 **Proyección a futuro (opcional).** Con `revalorizacion_anual > 0` se estima, a
 `horizonte_anios`, la ganancia por revalorización del precio y el **ROI proyectado**
 (revalorización + flujo del alquiler sobre el dinero invertido). Es una proyección

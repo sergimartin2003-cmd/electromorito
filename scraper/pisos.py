@@ -31,7 +31,8 @@ CAMPOS_PISOS = [
     "titulo", "zona", "precio", "superficie", "precio_m2", "mediana_zona_m2",
     "descuento_zona", "es_chollo", "habitaciones", "estado", "planta", "ascensor",
     "terraza", "garaje", "exterior", "alquiler_mensual", "alquiler_estimado",
-    "rentabilidad_bruta", "rentabilidad_neta", "rentabilidad_neta_estres", "per",
+    "rentabilidad_bruta", "rentabilidad_neta", "rentabilidad_neta_estres",
+    "rentabilidad_neta_impuestos", "per",
     "roi_proyectado_pct", "roi_anual_medio_pct", "ganancia_capital",
     "precio_objetivo", "cumple_objetivo", "clasificacion",
     "cuota_hipoteca", "cash_flow_mensual", "rentabilidad_fondos_propios",
@@ -62,6 +63,8 @@ def parametros_desde_config(config) -> ParametrosRentabilidad:
         horizonte_anios=getattr(config, "horizonte_anios", 10),
         estres_alquiler_pct=getattr(config, "estres_alquiler_pct", 0.0),
         rentabilidad_objetivo=getattr(config, "rentabilidad_objetivo", 0.0),
+        tipo_irpf=getattr(config, "tipo_irpf", 0.0),
+        reduccion_irpf=getattr(config, "reduccion_irpf", 0.60),
     )
 
 
@@ -272,6 +275,7 @@ _COLS_BASE = [
     ("clasificacion", "Valoración"),
 ]
 _COLS_ESTRES = [("rentabilidad_neta_estres", "Rent. neta (estrés)")]
+_COLS_IRPF = [("rentabilidad_neta_impuestos", "Rent. neta (tras IRPF)")]
 _COLS_PROY = [("roi_anual_medio_pct", "ROI medio/año")]
 _COLS_OBJ = [("precio_objetivo", "Precio objetivo")]
 _COLS_HIPOTECA = [
@@ -283,9 +287,9 @@ _COLS_FIN = [("url", "Anuncio")]
 _COLS_NUM = [
     "puntuacion", "precio", "superficie", "precio_m2", "mediana_zona_m2",
     "descuento_zona", "habitaciones", "alquiler_mensual", "rentabilidad_bruta",
-    "rentabilidad_neta", "rentabilidad_neta_estres", "per", "roi_anual_medio_pct",
-    "roi_proyectado_pct", "ganancia_capital", "precio_objetivo", "cuota_hipoteca",
-    "cash_flow_mensual", "rentabilidad_fondos_propios", "fondos_propios",
+    "rentabilidad_neta", "rentabilidad_neta_estres", "rentabilidad_neta_impuestos", "per",
+    "roi_anual_medio_pct", "roi_proyectado_pct", "ganancia_capital", "precio_objetivo",
+    "cuota_hipoteca", "cash_flow_mensual", "rentabilidad_fondos_propios", "fondos_propios",
 ]
 
 
@@ -293,11 +297,13 @@ def construir_html_pisos(pisos: List[dict]) -> str:
     """Devuelve el panel HTML autónomo (como cadena) para la lista de pisos evaluados."""
     con_hipoteca = any(p.get("cuota_hipoteca") is not None for p in pisos)
     con_estres = any(p.get("rentabilidad_neta_estres") is not None for p in pisos)
+    con_irpf = any(p.get("rentabilidad_neta_impuestos") is not None for p in pisos)
     con_proy = any(p.get("roi_anual_medio_pct") is not None for p in pisos)
     con_ia = any((p.get("ia_riesgos") or p.get("ia_resumen")) for p in pisos)
     con_obj = any(p.get("precio_objetivo") is not None for p in pisos)
     cols = (_COLS_BASE
             + (_COLS_ESTRES if con_estres else [])
+            + (_COLS_IRPF if con_irpf else [])
             + (_COLS_PROY if con_proy else [])
             + (_COLS_OBJ if con_obj else [])
             + (_COLS_HIPOTECA if con_hipoteca else [])
@@ -352,6 +358,9 @@ def construir_informe_md(pisos: List[dict], params, titulo: str = "Rentabilidad 
                          f"{params.anios_hipoteca} años ({params.interes_hipoteca * 100:.1f} %)")
     if getattr(params, "rentabilidad_objetivo", 0) > 0:
         supuestos.append(f"objetivo {params.rentabilidad_objetivo:g} % neto")
+    if getattr(params, "tipo_irpf", 0) > 0:
+        supuestos.append(f"IRPF {params.tipo_irpf * 100:g} % (reducción "
+                         f"{int(params.reduccion_irpf * 100)} %)")
     lineas.append("**Supuestos:** " + "; ".join(supuestos) + ".")
     if chollos:
         lineas.append(f"**Chollos detectados:** {len(chollos)} 🔥 "
@@ -632,7 +641,8 @@ function celda(col, fila) {
     return fmtEur(v) + est;
   }
   if (col === "rentabilidad_bruta") return fmtPct(v);
-  if (col === "rentabilidad_neta_estres" || col === "roi_anual_medio_pct") return fmtPct(v);
+  if (col === "rentabilidad_neta_estres" || col === "roi_anual_medio_pct"
+      || col === "rentabilidad_neta_impuestos") return fmtPct(v);
   if (col === "rentabilidad_neta") return v==null ? "" : `<span class="neta">${fmtPct(v)}</span>`;
   if (col === "rentabilidad_fondos_propios") return v==null ? "" : `<span class="neta">${fmtPct(v)}</span>`;
   if (col === "cuota_hipoteca") return fmtEur(v);
