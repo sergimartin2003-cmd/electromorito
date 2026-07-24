@@ -1,10 +1,8 @@
-"""Scraper de contactos de fundaciones, escuelas PFI/IFE y centros de estudios.
+"""Análisis de rentabilidad de alquiler de pisos.
 
-Abre un navegador real en tu ordenador, realiza búsquedas en un buscador,
-visita las webs de los resultados y extrae correos y teléfonos de contacto
-que estén publicados de forma pública.
-
-Uso responsable: revisa el README (sección "Uso responsable y legal").
+A partir de una lista de anuncios (CSV/JSON/XLSX) calcula la rentabilidad de cada
+piso (bruta, neta, tras IRPF, apalancada), detecta chollos y genera un CSV, un panel
+HTML interactivo (con mapa, gráficos y comparador) y un informe.
 """
 
-__version__ = "1.0.0"
+__version__ = "2.0.0"

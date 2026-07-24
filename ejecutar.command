@@ -1,10 +1,6 @@
 #!/bin/bash
-# Doble clic en Mac para la EJECUCIÓN COMPLETA.
-# Puedes pararlo cuando quieras con Ctrl+C; lo recogido queda guardado.
+# Doble clic en Mac: abre la INTERFAZ WEB local y el navegador.
+# Para pararla, cierra esta ventana o pulsa Ctrl+C.
 cd "$(dirname "$0")"
-bash run.sh
-echo ""
-echo "======================================================"
-echo "  Terminado. Mira los ficheros resultados.* en esta carpeta."
-echo "  Pulsa Enter para cerrar."
-read _
+( sleep 2; open "http://127.0.0.1:8000" ) &
+bash run.sh --web

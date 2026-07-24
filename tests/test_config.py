@@ -1,123 +1,40 @@
-"""Tests de carga y validación de la configuración."""
-
-import textwrap
+"""Tests de la carga y validación de la configuración (config.yaml)."""
 
 import pytest
 
 from scraper.config import Config
 
 
-def _escribir(tmp_path, contenido: str):
-    ruta = tmp_path / "config.yaml"
-    ruta.write_text(textwrap.dedent(contenido), encoding="utf-8")
-    return str(ruta)
+def test_cargar_config_de_ejemplo():
+    # El config.yaml del repo debe cargar sin errores
+    cfg = Config.cargar("config.yaml")
+    assert cfg.gastos_pct > 0
+    assert isinstance(cfg.rentas_zona, dict)
 
 
-def test_config_minima(tmp_path):
-    ruta = _escribir(tmp_path, """
-        categorias: ["fundación discapacidad"]
-        ubicaciones: ["Madrid", "Barcelona"]
-    """)
-    cfg = Config.cargar(ruta)
-    busquedas = cfg.construir_busquedas()
-    assert len(busquedas) == 2
-    assert busquedas[0] == ("fundación discapacidad", "Madrid", "fundación discapacidad Madrid")
+def test_valores_por_defecto_y_coercion(tmp_path):
+    yaml = tmp_path / "c.yaml"
+    yaml.write_text(
+        "gastos_pct: '0.3'\n"          # texto -> número
+        "financiacion_pct: 2\n"        # se limita a 0.95
+        "usar_ia: 'no'\n"
+        "rentas_zona:\n  Madrid: 15\n  Mala: 0\n",  # 0 se descarta
+        encoding="utf-8",
+    )
+    cfg = Config.cargar(str(yaml))
+    assert cfg.gastos_pct == 0.3
+    assert cfg.financiacion_pct == 0.95
+    assert cfg.usar_ia is False
+    assert cfg.rentas_zona == {"Madrid": 15.0}
 
 
-def test_coercion_de_tipos(tmp_path):
-    ruta = _escribir(tmp_path, """
-        categorias: ["x"]
-        resultados_por_busqueda: "20"
-        espera_min_segundos: "1.5"
-        navegador_visible: "no"
-        respetar_robots: "sí"
-        max_busquedas: -5
-    """)
-    cfg = Config.cargar(ruta)
-    assert cfg.resultados_por_busqueda == 20 and isinstance(cfg.resultados_por_busqueda, int)
-    assert cfg.espera_min_segundos == 1.5 and isinstance(cfg.espera_min_segundos, float)
-    assert cfg.navegador_visible is False
-    assert cfg.respetar_robots is True
-    assert cfg.max_busquedas == 0  # negativo -> 0
+def test_config_inexistente():
+    with pytest.raises(FileNotFoundError):
+        Config.cargar("no_existe_este_fichero.yaml")
 
 
-def test_listas_none_y_ruido(tmp_path):
-    ruta = _escribir(tmp_path, """
-        categorias: ["fundación", "  ", "escuela"]
-        ubicaciones:
-        dominios_excluidos:
-    """)
-    cfg = Config.cargar(ruta)
-    assert cfg.categorias == ["fundación", "escuela"]
-    assert cfg.ubicaciones == []
-    assert cfg.dominios_excluidos == []
-
-
-def test_motor_invalido(tmp_path):
-    ruta = _escribir(tmp_path, """
-        categorias: ["x"]
-        motor_busqueda: "yahoo"
-    """)
-    with pytest.raises(ValueError):
-        Config.cargar(ruta)
-
-
-def test_motor_unico(tmp_path):
-    ruta = _escribir(tmp_path, """
-        categorias: ["x"]
-        motor_busqueda: "bing"
-    """)
-    assert Config.cargar(ruta).motores == ["bing"]
-
-
-def test_motor_auto_expande(tmp_path):
-    ruta = _escribir(tmp_path, """
-        categorias: ["x"]
-        motor_busqueda: "auto"
-    """)
-    cfg = Config.cargar(ruta)
-    assert cfg.motores[0] == "duckduckgo" and len(cfg.motores) >= 2
-
-
-def test_motor_lista(tmp_path):
-    ruta = _escribir(tmp_path, """
-        categorias: ["x"]
-        motor_busqueda: ["duckduckgo", "google", "duckduckgo"]
-    """)
-    # Se respeta el orden y se quitan duplicados
-    assert Config.cargar(ruta).motores == ["duckduckgo", "google"]
-
-
-def test_sin_nada_que_buscar(tmp_path):
-    ruta = _escribir(tmp_path, """
-        ubicaciones: ["Madrid"]
-    """)
-    with pytest.raises(ValueError):
-        Config.cargar(ruta)
-
-
-def test_yaml_no_es_diccionario(tmp_path):
-    ruta = tmp_path / "config.yaml"
-    ruta.write_text("- uno\n- dos\n", encoding="utf-8")
-    with pytest.raises(ValueError):
-        Config.cargar(str(ruta))
-
-
-def test_max_busquedas_limita(tmp_path):
-    ruta = _escribir(tmp_path, """
-        categorias: ["a", "b", "c"]
-        ubicaciones: ["M", "B"]
-        max_busquedas: 3
-    """)
-    cfg = Config.cargar(ruta)
-    assert len(cfg.construir_busquedas()) == 3
-
-
-def test_busquedas_extra_provincia_vacia(tmp_path):
-    ruta = _escribir(tmp_path, """
-        categorias: []
-        busquedas_extra: ["fundación autismo contacto"]
-    """)
-    cfg = Config.cargar(ruta)
-    b = cfg.construir_busquedas()
-    assert b == [("extra", "", "fundación autismo contacto")]
+def test_claves_desconocidas_se_ignoran(tmp_path):
+    yaml = tmp_path / "c.yaml"
+    yaml.write_text("gastos_pct: 0.25\nmotor_busqueda: duckduckgo\n", encoding="utf-8")
+    cfg = Config.cargar(str(yaml))          # 'motor_busqueda' (del scraper viejo) se ignora
+    assert not hasattr(cfg, "motor_busqueda")

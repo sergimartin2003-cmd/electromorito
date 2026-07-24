@@ -1,7 +1,4 @@
-# Dependencias del scraper de contactos
+# Dependencias del análisis de rentabilidad de pisos.
 # Instálalas con:  pip install -r requirements.txt
-# Y luego:         playwright install chromium
-
-playwright>=1.40
 PyYAML>=6.0
 openpyxl>=3.1

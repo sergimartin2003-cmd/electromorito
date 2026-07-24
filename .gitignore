@@ -6,16 +6,10 @@ __pycache__/
 *.pyc
 .pytest_cache/
 
-# Resultados generados por el scraper
-resultados.csv
-resultados.xlsx
-resultados.html
-*_contactos.csv
+# Ficheros de salida generados
 *_pisos.csv
 *_pisos.html
 *_pisos.md
-*_dominios_visitados.txt
-salida/
 *.log
 
 # Sistema

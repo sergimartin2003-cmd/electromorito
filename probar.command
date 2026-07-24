@@ -1,9 +1,10 @@
 #!/bin/bash
-# Doble clic en Mac para una PRUEBA RÁPIDA (solo 3 búsquedas).
-# La primera vez instala todo (tarda unos minutos); después es rápido.
+# Doble clic en Mac: analiza el fichero de EJEMPLO (pisos_ejemplo.csv).
+# La primera vez instala todo (tarda un poco); después es rápido.
 cd "$(dirname "$0")"
-bash run.sh --prueba
+bash run.sh --pisos pisos_ejemplo.csv
 echo ""
 echo "======================================================"
-echo "  Prueba terminada. Pulsa Enter para cerrar."
+echo "  Listo. Abre 'resultados_pisos.html' en esta carpeta."
+echo "  Pulsa Enter para cerrar."
 read _

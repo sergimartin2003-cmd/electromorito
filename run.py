@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
-"""Lanzador cómodo del scraper.
+"""Lanzador cómodo. Equivale a  `python -m scraper`.
 
-Equivale a  `python -m scraper`.  Ejecútalo con:
-
-    python run.py                 # usa config.yaml
-    python run.py --prueba        # prueba rápida (3 búsquedas)
-    python run.py -c otro.yaml    # con otra configuración
+    python run.py --pisos pisos.csv     # analiza un fichero de anuncios
+    python run.py --web                 # interfaz web local (pega y analiza)
+    python run.py -c otro.yaml --pisos pisos.csv
 """
 
 from scraper.__main__ import main

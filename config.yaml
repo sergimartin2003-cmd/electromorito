@@ -1,256 +1,71 @@
 # =========================================================================
-#  CONFIGURACIÓN DEL SCRAPER DE CONTACTOS
+#  CONFIGURACIÓN DEL ANÁLISIS DE RENTABILIDAD DE PISOS
 # =========================================================================
-#  Edita este archivo para decidir QUÉ buscar y CÓMO comportarse.
-#  Todo está en español. Guarda el archivo y ejecuta:  python run.py
+#  Edita este archivo y ejecuta:
+#     python run.py --pisos pisos.csv     (analiza un fichero de anuncios)
+#     python run.py --web                 (interfaz web local)
 # =========================================================================
 
-# --- Buscador a usar --------------------------------------------------
-# Opciones: "duckduckgo" (recomendado, tolera bien la automatización)
-#           "bing"       (permite más páginas de resultados)
-#           "mojeek"     (buscador propio, muy tolerante)
-#           "startpage"  (resultados de Google; puede pedir aceptar cookies)
-#           "google"     (frágil: suele mostrar CAPTCHA/consentimiento)
-#           "auto"       (prueba duckduckgo, luego mojeek, luego bing)
-# También puedes poner una lista y se prueban en orden hasta obtener resultados:
-#   motor_busqueda: [duckduckgo, mojeek, bing]
-motor_busqueda: duckduckgo
-
-# Región/idioma para orientar los resultados (buscará sobre todo en España)
-idioma_region: es-es
-
-# --- Qué buscar -------------------------------------------------------
-# El scraper combina CADA categoría con CADA ubicación.
-# Ejemplo: "fundación discapacidad" + "Madrid" => "fundación discapacidad Madrid"
-# Con estas listas salen MUCHAS búsquedas (categorías x ciudades). Si es demasiado,
-# quita categorías o ciudades que no te interesen, o usa 'max_busquedas' más abajo.
-# Puedes borrar el # para activar una línea, o poner # delante para desactivarla.
-categorias:
-  # --- Educación especial y formación ---
-  - "colegio de educación especial"
-  - "centro de educación especial"
-  - "escuela PFI programa de formación e inserción"
-  - "centro IFE itinerario formativo específico"
-  - "centro de atención temprana discapacidad"
-  - "aula TEA colegio"
-
-  # --- Fundaciones y asociaciones ---
-  - "fundación discapacidad"
-  - "fundación personas con discapacidad"
-  - "fundación tutelar discapacidad"
-  - "asociación discapacidad"
-  - "asociación de familias personas con discapacidad"
-  - "asociación autismo TEA"
-  - "asociación síndrome de Down"
-  - "asociación parálisis cerebral"
-
-  # --- Empleo e inserción laboral (empresas que contratan discapacidad) ---
-  - "centro especial de empleo"
-  - "empresa de inserción laboral discapacidad"
-  - "empleo con apoyo discapacidad"
-
-  # --- Atención, ocio y centros ---
-  - "centro ocupacional discapacidad"
-  - "centro de día personas con discapacidad"
-  - "residencia personas con discapacidad"
-
-# Ciudades donde buscar. Están activas las 15 más grandes para que no tarde
-# demasiado. Para buscar también en las demás, quita el # del principio de su línea.
-ubicaciones:
-  - Madrid
-  - Barcelona
-  - Valencia
-  - Sevilla
-  - Zaragoza
-  - Málaga
-  - Murcia
-  - Bilbao
-  - Alicante
-  - Córdoba
-  - Valladolid
-  - Vigo
-  - "A Coruña"
-  - Granada
-  - "Palma de Mallorca"
-  # --- Quita el # para activar también estas ciudades ---
-  # - "Las Palmas"
-  # - "Santa Cruz de Tenerife"
-  # - Gijón
-  # - Pamplona
-  # - Santander
-  # - "San Sebastián"
-  # - Girona
-  # - Tarragona
-  # - Lleida
-  # - Castellón
-  # - Badajoz
-  # - Salamanca
-  # - León
-  # - Burgos
-  # - Toledo
-
-# Búsquedas sueltas adicionales (se añaden tal cual, sin combinar con ubicaciones)
-busquedas_extra: []
-#  - "fundación autismo Cataluña contacto"
-#  - "escuela educación especial Andalucía email"
-
-# --- Cuánto rastrear --------------------------------------------------
-resultados_por_busqueda: 15      # cuántas webs coger de cada búsqueda
-paginas_por_busqueda: 1          # páginas de resultados por búsqueda (DuckDuckGo y Bing)
-max_paginas_por_web: 4           # portada + páginas de contacto/aviso legal a visitar
-max_busquedas: 0                 # 0 = sin límite. Pon p.ej. 5 para una prueba rápida
-
-# --- Comportamiento del navegador -------------------------------------
-# Ruta a un Chrome/Chromium ya instalado (déjalo vacío para usar el de Playwright).
-# Útil si no puedes ejecutar "playwright install". Ej. en Windows:
-#   ruta_navegador: "C:/Program Files/Google/Chrome/Application/chrome.exe"
-ruta_navegador: ""
-navegador_visible: true          # true = ves el navegador; false = oculto (más rápido)
-bloquear_recursos: true          # no descarga imágenes/vídeos/fuentes (mucho más rápido)
-timeout_segundos: 30             # tiempo máximo de espera al cargar una web
-
-# --- Buen comportamiento (no saturar los servidores) ------------------
-espera_min_segundos: 2.0         # pausa aleatoria mínima entre webs
-espera_max_segundos: 5.0         # pausa aleatoria máxima entre webs
-espera_adaptativa: true          # sube el ritmo de espera si el buscador limita, y lo baja al ir bien
-respetar_robots: true            # respeta el robots.txt de cada web (recomendado)
-
-# Dominios que NUNCA se rastrean (redes sociales, directorios, buscadores…)
-dominios_excluidos:
-  - facebook.com
-  - instagram.com
-  - twitter.com
-  - x.com
-  - linkedin.com
-  - youtube.com
-  - tiktok.com
-  - wikipedia.org
-  - google.com
-  - bing.com
-  - duckduckgo.com
-  - amazon.es
-  - amazon.com
-  - pinterest.com
-  - yelp.com
-  - paginasamarillas.es
-  - infojobs.net
-
-# --- Relevancia (para descartar resultados que no van del tema) -------
-# Se cuenta cuántas de estas palabras aparecen en cada web: cuantas más,
-# más probable es que sea una organización del sector que buscas.
-palabras_relevancia:
-  - discapacidad
-  - diversidad funcional
-  - educación especial
-  - inclusión
-  - inclusiva
-  - autismo
-  - TEA
-  - síndrome de down
-  - parálisis cerebral
-  - discapacidad intelectual
-  - discapacidad física
-  - discapacidad sensorial
-  - fundación
-  - asociación
-  - PFI
-  - IFE
-  - formación e inserción
-  - itinerario formativo
-  - alumnos
-  - alumnado
-  - centro ocupacional
-  - centro especial de empleo
-  - inserción laboral
-  - empleo con apoyo
-  - trabajadores con discapacidad
-  - atención temprana
-  - centro de día
-  - centro de educación especial
-  - colegio de educación especial
-  - residencia
-  - plena inclusión
-
-# Si es true, NO guarda las webs cuya relevancia sea 0 (ninguna palabra encontrada)
-guardar_solo_relevantes: false
-
-# Si es true, comprueba por DNS que el dominio de cada correo existe y descarta
-# los que no resuelven (webs caídas o correos mal escritos). Es más lento y
-# opcional; si tu DNS falla no descarta nada (para no perder contactos válidos).
-verificar_dominio: false
-
-# --- Salida -----------------------------------------------------------
-# Se generan  <archivo_salida>.csv, .xlsx  y  .html  (panel navegable)
-# Columnas: nombre, correo, tipo_correo, telefonos, provincia, codigo_postal,
-#           categoria, relevancia, web, redes, dominio, grupo, busqueda, fecha
+# Nombre base de los ficheros de salida: <archivo_salida>_pisos.csv/.html/.md
 archivo_salida: resultados
 
-# =========================================================================
-#  RENTABILIDAD DE PISOS  (modo:  python run.py --pisos pisos.csv)
-# =========================================================================
-#  Este modo NO rastrea la web. Lee una lista de anuncios (CSV o JSON) que tú
-#  aportas, calcula la rentabilidad del alquiler de cada uno y genera:
-#     <archivo_salida>_pisos.csv   y   <archivo_salida>_pisos.html
-#  El panel HTML enlaza a cada anuncio ("Ver anuncio →"), ordenado de más a
-#  menos rentable. Pruébalo con el fichero de ejemplo:
-#     python run.py --pisos pisos_ejemplo.csv
-
-# Supuestos económicos del cálculo (ajústalos a tu caso):
+# --- Supuestos económicos del cálculo ---------------------------------
 gastos_pct: 0.25          # % del alquiler que se va en gastos (IBI, comunidad, seguro, mantenimiento, gestión, vacancia)
 costes_compra_pct: 0.11   # % sobre el precio por impuestos y gastos de compra (ITP/IVA, notaría, registro, agencia)
 
-# Hipoteca (análisis con apalancamiento). Si compras al contado, pon financiacion_pct: 0
-# y el panel omitirá las columnas de cuota/cash-flow/rentabilidad sobre fondos propios.
+# --- Hipoteca (análisis con apalancamiento) ---------------------------
+# Si compras al contado, pon financiacion_pct: 0 y el panel omitirá las columnas
+# de cuota/cash-flow/rentabilidad sobre fondos propios.
 financiacion_pct: 0.70    # % del precio que financias con hipoteca (0.70 = 70 %)
 interes_hipoteca: 0.03    # interés nominal anual (0.03 = 3 %)
 anios_hipoteca: 25        # plazo de la hipoteca en años
 
-# Detección de "chollos": un piso se marca 🔥 si su €/m² está este % (o más) por
-# debajo de la MEDIANA de €/m² de su zona (calculada con los pisos del propio fichero;
-# hacen falta al menos 2 pisos en la zona para comparar).
+# --- Detección de "chollos" -------------------------------------------
+# Un piso se marca 🔥 si su €/m² está este % (o más) por debajo de la MEDIANA de
+# €/m² de su zona (calculada con los pisos del propio fichero; hacen falta al menos
+# 2 pisos en la zona para comparar).
 umbral_chollo: 10         # % por debajo de la mediana de la zona
 
-# Proyección a futuro (opcional). Con revalorizacion_anual > 0 se calcula, para cada
-# piso, la ganancia por revalorización y el ROI proyectado a 'horizonte_anios'.
+# --- Proyección a futuro (opcional) -----------------------------------
+# Con revalorizacion_anual > 0 se calcula la ganancia por revalorización y el ROI
+# proyectado a 'horizonte_anios'.
 revalorizacion_anual: 0.02   # revalorización anual estimada del precio (0.02 = 2 %). 0 = desactivado
 horizonte_anios: 10          # años de la proyección
 
-# Escenario de estrés (opcional). Con estres_alquiler_pct > 0 se calcula una
-# rentabilidad neta "pesimista" suponiendo el alquiler ese % más bajo.
+# --- Escenario de estrés (opcional) -----------------------------------
+# Con estres_alquiler_pct > 0 se calcula una rentabilidad neta "pesimista"
+# suponiendo el alquiler ese % más bajo.
 estres_alquiler_pct: 0.10    # 0.10 = alquiler un 10 % más bajo. 0 = desactivado
 
-# Rentabilidad objetivo (opcional). Con un valor > 0 se calcula, para cada piso, el
-# "precio objetivo": a qué precio deberías comprarlo para lograr esa rentabilidad neta.
-# Muy útil para negociar. En el panel puedes filtrar "solo si cumplen objetivo".
+# --- Rentabilidad objetivo (opcional) ---------------------------------
+# Con un valor > 0 se calcula, para cada piso, el "precio objetivo": a qué precio
+# deberías comprarlo para lograr esa rentabilidad neta. Útil para negociar.
 rentabilidad_objetivo: 7     # % de rentabilidad neta que persigues. 0 = desactivado
 
-# IRPF (opcional). Con tipo_irpf > 0 se calcula la rentabilidad neta DESPUÉS de
-# impuestos, aplicando la reducción del rendimiento neto por alquiler de vivienda
-# habitual (60 % general) y tu tipo marginal de IRPF. Es una aproximación.
+# --- IRPF (opcional) --------------------------------------------------
+# Con tipo_irpf > 0 se calcula la rentabilidad neta DESPUÉS de impuestos: descuenta
+# los intereses de la hipoteca (deducibles), aplica la reducción por alquiler de
+# vivienda habitual y tu tipo marginal. Es una aproximación.
 tipo_irpf: 0.30              # tu tipo marginal de IRPF (0.30 = 30 %). 0 = desactivado
-reduccion_irpf: 0.60        # reducción del rendimiento neto (0.60 = 60 %, vivienda habitual)
+reduccion_irpf: 0.60         # reducción del rendimiento neto (0.60 = 60 %, vivienda habitual)
 
-# Tabla de rentas de referencia integrada (€/m²·mes orientativos por provincia). Se usa
-# para estimar el alquiler cuando la zona no está en tu 'rentas_zona'. Tus valores de
-# 'rentas_zona' siempre mandan. Reemplázala/afínala con datos de SERPAVI. false = no usarla.
-usar_rentas_referencia: true
-
-# --- IA opcional (API de Claude) --------------------------------------
-# Si la activas, para los pisos SIN alquiler indicado se le pide a Claude que
-# estime el alquiler de mercado y detecte riesgos (okupas, derramas, sin ascensor…).
-# Requiere instalar el SDK y una clave:  pip install -r requirements-ia.txt
-#   y  export ANTHROPIC_API_KEY=...   (o `ant auth login`).
-# Si no está disponible, NO falla: se usa la estimación por zona de siempre.
-# También puedes activarla puntualmente con la opción  --ia  al ejecutar.
-usar_ia: false
-modelo_ia: claude-opus-4-8    # modelo a usar (déjalo así salvo que quieras otro)
-
-# Alquiler de referencia en €/m²/mes por zona. Sirve para ESTIMAR el alquiler
-# cuando el anuncio de venta no lo trae. Pon valores reales de tu mercado.
-# La zona del anuncio se empareja de forma flexible (la clave más específica gana).
+# --- Estimación del alquiler ------------------------------------------
+# €/m²/mes de referencia por zona, para estimar el alquiler cuando el anuncio de
+# venta no lo trae. Tus valores mandan sobre la tabla integrada.
 rentas_zona:
   Barcelona: 14
   "Madrid centro": 18
   Madrid: 15
   Valencia: 11
   Sevilla: 10
+
+# Usar la tabla de rentas de referencia integrada (€/m²·mes orientativos por provincia)
+# para las zonas que no estén en 'rentas_zona'. Reemplázala/afínala con datos de SERPAVI.
+usar_rentas_referencia: true
+
+# --- IA opcional (API de Claude) --------------------------------------
+# Para los pisos SIN alquiler indicado, pide a Claude que lo estime y detecte riesgos.
+# Requiere:  pip install -r requirements-ia.txt   y   export ANTHROPIC_API_KEY=...
+# Si no está disponible, NO falla: se usa la estimación por zona. También: opción --ia.
+usar_ia: false
+modelo_ia: claude-opus-4-8
