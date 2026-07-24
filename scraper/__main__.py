@@ -70,6 +70,11 @@ def main() -> None:
              "detectar riesgos en los pisos que no traen alquiler.",
     )
     parser.add_argument(
+        "--rentas", default=None, metavar="ARCHIVO",
+        help="Con --pisos/--web: carga una tabla de rentas (€/m²·mes por zona, p. ej. de "
+             "SERPAVI) desde un CSV/JSON/XLSX y la usa para estimar el alquiler.",
+    )
+    parser.add_argument(
         "--web", action="store_true",
         help="Abre una interfaz web local: pega los anuncios y obtén el ranking de rentabilidad.",
     )
@@ -98,6 +103,16 @@ def main() -> None:
 
     if args.ia:
         config.usar_ia = True
+
+    if args.rentas:
+        from .pisos import cargar_rentas_zona_csv
+        try:
+            extra = cargar_rentas_zona_csv(args.rentas)
+        except (FileNotFoundError, ValueError) as e:
+            print(f"ERROR al leer las rentas: {e}")
+            sys.exit(1)
+        config.rentas_zona = {**(config.rentas_zona or {}), **extra}
+        print(f"  Rentas por zona cargadas de '{args.rentas}': {len(extra)} zona(s).")
 
     if args.web:
         from .web import iniciar_servidor

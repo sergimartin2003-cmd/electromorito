@@ -145,6 +145,38 @@ def _marcar_duplicados(pisos: List[dict]) -> None:
             vistos.add(clave)
 
 
+def cargar_rentas_zona_csv(ruta: str) -> dict:
+    """Lee una tabla de rentas (€/m²·mes por zona) desde CSV/JSON/XLSX → dict {zona: eur}.
+
+    Detecta de forma flexible la columna de zona y la de precio (p. ej. una exportación
+    de SERPAVI). Columnas de zona: zona/ciudad/municipio/provincia/… ; de precio:
+    eur_m2_mes/euro_m2/precio_m2/renta_m2/valor/renta…
+    """
+    from .fuentes import _clave  # import diferido (evita ciclo de importación)
+    from .rentabilidad import _a_numero
+
+    filas = cargar_pisos(ruta)
+    claves_zona = [_clave(k) for k in
+                   ("zona", "ciudad", "municipio", "provincia", "poblacion", "localidad",
+                    "barrio", "nombre", "seccion", "distrito")]
+    claves_val = [_clave(k) for k in
+                  ("eurm2mes", "eurosm2mes", "eurm2", "eurosm2", "preciom2", "rentam2",
+                   "alquilerm2", "valor", "renta", "importe", "precio")]
+    rentas: dict = {}
+    for fila in filas:
+        norm = {_clave(k): v for k, v in fila.items()}
+        zona = next((norm[c] for c in claves_zona if norm.get(c) not in (None, "")), None)
+        valor = None
+        for c in claves_val:
+            if norm.get(c) not in (None, ""):
+                valor = _a_numero(norm[c])
+                if valor:
+                    break
+        if zona and valor:
+            rentas[str(zona).strip()] = valor
+    return rentas
+
+
 def parsear_texto(texto: str) -> List[dict]:
     """Convierte un texto pegado (CSV o JSON) en una lista de anuncios (dicts)."""
     texto = (texto or "").strip()
@@ -278,6 +310,73 @@ def generar_informe_pisos(pisos: List[dict], ruta_html: str) -> str:
     return ruta_html
 
 
+def _eur(valor) -> str:
+    if valor in (None, ""):
+        return "—"
+    return f"{int(round(float(valor))):,} €".replace(",", ".")
+
+
+def _pct(valor) -> str:
+    if valor in (None, ""):
+        return "—"
+    return f"{float(valor):.2f}".replace(".", ",") + " %"
+
+
+def construir_informe_md(pisos: List[dict], params, titulo: str = "Rentabilidad de pisos",
+                         top: int = 10) -> str:
+    """Devuelve un informe en Markdown con las mejores oportunidades (para email/compartir)."""
+    completos = [p for p in pisos if p.get("completo")]
+    chollos = [p for p in completos if p.get("es_chollo")]
+    con_hip = getattr(params, "financiacion_pct", 0) and params.financiacion_pct > 0
+
+    lineas: List[str] = []
+    lineas.append(f"# {titulo}")
+    lineas.append(f"_Generado el {_dt.date.today().isoformat()} · {len(pisos)} anuncios, "
+                  f"{len(completos)} con rentabilidad calculada._")
+    lineas.append("")
+
+    supuestos = [f"gastos {int(params.gastos_pct * 100)} %",
+                 f"costes de compra +{int(params.costes_compra_pct * 100)} %"]
+    if con_hip:
+        supuestos.append(f"hipoteca {int(params.financiacion_pct * 100)} % a "
+                         f"{params.anios_hipoteca} años ({params.interes_hipoteca * 100:.1f} %)")
+    if getattr(params, "rentabilidad_objetivo", 0) > 0:
+        supuestos.append(f"objetivo {params.rentabilidad_objetivo:g} % neto")
+    lineas.append("**Supuestos:** " + "; ".join(supuestos) + ".")
+    if chollos:
+        lineas.append(f"**Chollos detectados:** {len(chollos)} 🔥 "
+                      "(por debajo de la mediana de €/m² de su zona).")
+    lineas.append("")
+
+    n = min(top, len(completos))
+    lineas.append(f"## Mejores oportunidades (top {n})" if n else "## Sin pisos con rentabilidad")
+    if n:
+        cabecera = ["#", "Puntuación", "Piso", "Zona", "Precio", "Rent. neta"]
+        if con_hip:
+            cabecera.append("Cash-flow/mes")
+        cabecera.append("Enlace")
+        lineas.append("| " + " | ".join(cabecera) + " |")
+        lineas.append("|" + "|".join(["---"] * len(cabecera)) + "|")
+        for i, p in enumerate(completos[:top], 1):
+            nombre = (p.get("titulo") or "(sin título)").replace("|", "/")
+            if p.get("es_chollo"):
+                nombre += " 🔥"
+            fila = [str(i), str(p.get("puntuacion") or ""), nombre, p.get("zona") or "—",
+                    _eur(p.get("precio")), _pct(p.get("rentabilidad_neta"))]
+            if con_hip:
+                cf = p.get("cash_flow_mensual")
+                fila.append((f"+{_eur(cf)}" if (cf or 0) >= 0 else _eur(cf)) if cf is not None else "—")
+            url = (p.get("url") or "").replace("|", "%7C")
+            fila.append(f"[ver anuncio]({url})" if url else "—")
+            lineas.append("| " + " | ".join(fila) + " |")
+    lineas.append("")
+    lineas.append("---")
+    lineas.append("_Rentabilidades estimadas a partir de los datos del anuncio y de los supuestos "
+                  "configurados: verifica los números antes de decidir. Consigue los anuncios por "
+                  "una vía con la que tengas derecho (ver docs/fuentes_de_datos.md)._")
+    return "\n".join(lineas)
+
+
 def ejecutar_pisos(config, ruta_entrada: str) -> Optional[int]:
     """Flujo completo del modo pisos. Devuelve cuántos pisos se procesaron (o None si falla)."""
     try:
@@ -304,8 +403,11 @@ def ejecutar_pisos(config, ruta_entrada: str) -> Optional[int]:
     base = config.archivo_salida + "_pisos"
     ruta_csv = base + ".csv"
     ruta_html = base + ".html"
+    ruta_md = base + ".md"
     escribir_csv(pisos, ruta_csv)
     generar_informe_pisos(pisos, ruta_html)
+    with open(ruta_md, "w", encoding="utf-8") as f:
+        f.write(construir_informe_md(pisos, params))
 
     completos = [p for p in pisos if p.get("completo")]
     chollos = [p for p in completos if p.get("es_chollo")]
@@ -334,8 +436,9 @@ def ejecutar_pisos(config, ruta_entrada: str) -> Optional[int]:
             print(f"    [{p.get('puntuacion', 0):>3}]  {p['rentabilidad_neta']:>5.2f}% neta  "
                   f"{titulo:34}{marca}{extra}")
     print("\n  Ficheros generados:")
-    print(f"    CSV:   {ruta_csv}")
-    print(f"    Panel: {ruta_html}")
+    print(f"    CSV:      {ruta_csv}")
+    print(f"    Panel:    {ruta_html}")
+    print(f"    Informe:  {ruta_md}")
     print("=" * 64)
     return len(pisos)
 

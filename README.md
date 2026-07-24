@@ -135,6 +135,7 @@ Opciones disponibles:
 | `--contactos` | No rastrea: genera la lista depurada de contactos desde el CSV. |
 | `--desde-urls ARCHIVO` | No busca: extrae los contactos de una lista de URLs (una por línea). |
 | `--pisos ARCHIVO` | No rastrea: calcula la **rentabilidad** de los pisos de un CSV/JSON y genera un panel ordenado (ver más abajo). |
+| `--rentas ARCHIVO` | Con `--pisos`/`--web`: carga una tabla de **rentas por zona** (€/m²·mes, p. ej. de SERPAVI) para estimar el alquiler. |
 | `--ia` | Con `--pisos`: usa la **IA** (API de Claude) para estimar el alquiler y detectar riesgos en los pisos sin alquiler. |
 | `--navegador RUTA` | Usa un Chrome/Chromium ya instalado (si no usas `playwright install`). |
 | `-c ARCHIVO` | Usa otro archivo de configuración. |
@@ -308,6 +309,19 @@ O de forma permanente en `config.yaml` con `usar_ia: true`. Solo se llama a la I
 los pisos sin alquiler indicado (para acotar el coste); el modelo se configura con
 `modelo_ia` (por defecto `claude-opus-4-8`).
 
+### Rentas por zona desde un fichero (SERPAVI)
+
+Para que la estimación del alquiler use datos serios, puedes cargar una tabla de
+**€/m²·mes por zona** (por ejemplo, exportada de [SERPAVI](https://serpavi.mivau.gob.es)):
+
+```bash
+python run.py --pisos pisos.csv --rentas rentas_zona.csv
+```
+
+El fichero (CSV/JSON/XLSX) solo necesita una columna de zona (`zona`, `municipio`,
+`provincia`…) y otra de precio (`eur_m2_mes`, `precio_m2`, `renta_m2`, `valor`…). Esas
+rentas tienen prioridad sobre la tabla de referencia integrada.
+
 ### Interfaz web (opcional)
 
 Si prefieres no usar la terminal, hay una **interfaz web local** (sin dependencias
@@ -337,7 +351,10 @@ Todos los supuestos se configuran en `config.yaml`: `gastos_pct`, `costes_compra
 
 ### Resultado
 
-Se generan `<archivo_salida>_pisos.csv` y `<archivo_salida>_pisos.html`. El panel
+Se generan `<archivo_salida>_pisos.csv`, `<archivo_salida>_pisos.html` y también
+`<archivo_salida>_pisos.md` (un **informe en Markdown** con el resumen, los supuestos,
+los chollos y una tabla con las mejores oportunidades y su enlace, listo para pegar en
+un email o compartir). El panel
 HTML ordena los pisos por puntuación y permite **filtrar por zona, rentabilidad neta
 mínima, precio máximo y solo chollos**, ordenar por cualquier columna (puntuación,
 rentabilidad, PER, cash-flow, rentabilidad sobre fondos propios…) y abrir cada anuncio

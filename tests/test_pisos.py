@@ -5,6 +5,8 @@ import csv
 from scraper.pisos import (
     CAMPOS_PISOS,
     cargar_pisos,
+    cargar_rentas_zona_csv,
+    construir_informe_md,
     escribir_csv,
     generar_informe_pisos,
     procesar_pisos,
@@ -118,6 +120,23 @@ def test_escribir_csv(tmp_path):
     assert filas[0]["fecha"]  # se rellena la fecha
     # Los booleanos se escriben como sí/no
     assert filas[0]["alquiler_estimado"] in ("sí", "no")
+
+
+def test_informe_md_tiene_tabla_y_enlaces():
+    pisos = procesar_pisos(FILAS, PARAMS)
+    md = construir_informe_md(pisos, PARAMS)
+    assert md.startswith("# Rentabilidad de pisos")
+    assert "Mejores oportunidades" in md
+    assert "| # | Puntuación |" in md
+    assert "[ver anuncio](u1)" in md          # enlace al anuncio
+    assert "**Supuestos:**" in md
+
+
+def test_cargar_rentas_zona_csv(tmp_path):
+    csv_r = tmp_path / "serpavi.csv"
+    csv_r.write_text("municipio,eur_m2_mes\nMadrid,15\nBarcelona,14\n", encoding="utf-8")
+    rentas = cargar_rentas_zona_csv(str(csv_r))
+    assert rentas == {"Madrid": 15.0, "Barcelona": 14.0}
 
 
 def test_generar_informe_incrusta_datos(tmp_path):
