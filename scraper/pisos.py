@@ -32,7 +32,8 @@ CAMPOS_PISOS = [
     "descuento_zona", "es_chollo", "habitaciones", "estado", "planta", "ascensor",
     "terraza", "garaje", "exterior", "alquiler_mensual", "alquiler_estimado",
     "rentabilidad_bruta", "rentabilidad_neta", "rentabilidad_neta_estres", "per",
-    "roi_proyectado_pct", "roi_anual_medio_pct", "ganancia_capital", "clasificacion",
+    "roi_proyectado_pct", "roi_anual_medio_pct", "ganancia_capital",
+    "precio_objetivo", "cumple_objetivo", "clasificacion",
     "cuota_hipoteca", "cash_flow_mensual", "rentabilidad_fondos_propios",
     "fondos_propios", "puntuacion", "ia_resumen", "ia_riesgos", "ia_confianza",
     "duplicado", "url", "fecha",
@@ -41,10 +42,18 @@ CAMPOS_PISOS = [
 
 def parametros_desde_config(config) -> ParametrosRentabilidad:
     """Construye los ParametrosRentabilidad a partir del objeto Config."""
+    # Rentas por zona: parte de la tabla de referencia (si está activada) y encima las
+    # del usuario, que siempre tienen prioridad.
+    rentas: dict = {}
+    if getattr(config, "usar_rentas_referencia", True):
+        from .rentas_referencia import RENTAS_REFERENCIA
+        rentas.update(RENTAS_REFERENCIA)
+    rentas.update(dict(getattr(config, "rentas_zona", {}) or {}))
+
     return ParametrosRentabilidad(
         gastos_pct=getattr(config, "gastos_pct", 0.25),
         costes_compra_pct=getattr(config, "costes_compra_pct", 0.11),
-        rentas_zona=dict(getattr(config, "rentas_zona", {}) or {}),
+        rentas_zona=rentas,
         financiacion_pct=getattr(config, "financiacion_pct", 0.0),
         interes_hipoteca=getattr(config, "interes_hipoteca", 0.03),
         anios_hipoteca=getattr(config, "anios_hipoteca", 25),
@@ -52,6 +61,7 @@ def parametros_desde_config(config) -> ParametrosRentabilidad:
         revalorizacion_anual=getattr(config, "revalorizacion_anual", 0.0),
         horizonte_anios=getattr(config, "horizonte_anios", 10),
         estres_alquiler_pct=getattr(config, "estres_alquiler_pct", 0.0),
+        rentabilidad_objetivo=getattr(config, "rentabilidad_objetivo", 0.0),
     )
 
 
@@ -221,6 +231,7 @@ _COLS_BASE = [
 ]
 _COLS_ESTRES = [("rentabilidad_neta_estres", "Rent. neta (estrés)")]
 _COLS_PROY = [("roi_anual_medio_pct", "ROI medio/año")]
+_COLS_OBJ = [("precio_objetivo", "Precio objetivo")]
 _COLS_HIPOTECA = [
     ("cuota_hipoteca", "Cuota/mes"), ("cash_flow_mensual", "Cash-flow/mes"),
     ("rentabilidad_fondos_propios", "Rent. s/ fondos"),
@@ -231,8 +242,8 @@ _COLS_NUM = [
     "puntuacion", "precio", "superficie", "precio_m2", "mediana_zona_m2",
     "descuento_zona", "habitaciones", "alquiler_mensual", "rentabilidad_bruta",
     "rentabilidad_neta", "rentabilidad_neta_estres", "per", "roi_anual_medio_pct",
-    "roi_proyectado_pct", "ganancia_capital", "cuota_hipoteca", "cash_flow_mensual",
-    "rentabilidad_fondos_propios", "fondos_propios",
+    "roi_proyectado_pct", "ganancia_capital", "precio_objetivo", "cuota_hipoteca",
+    "cash_flow_mensual", "rentabilidad_fondos_propios", "fondos_propios",
 ]
 
 
@@ -242,9 +253,11 @@ def construir_html_pisos(pisos: List[dict]) -> str:
     con_estres = any(p.get("rentabilidad_neta_estres") is not None for p in pisos)
     con_proy = any(p.get("roi_anual_medio_pct") is not None for p in pisos)
     con_ia = any((p.get("ia_riesgos") or p.get("ia_resumen")) for p in pisos)
+    con_obj = any(p.get("precio_objetivo") is not None for p in pisos)
     cols = (_COLS_BASE
             + (_COLS_ESTRES if con_estres else [])
             + (_COLS_PROY if con_proy else [])
+            + (_COLS_OBJ if con_obj else [])
             + (_COLS_HIPOTECA if con_hipoteca else [])
             + (_COLS_IA if con_ia else [])
             + _COLS_FIN)
@@ -421,6 +434,7 @@ _PLANTILLA = r"""<!doctype html>
   <input type="number" id="fPrecio" placeholder="Precio máx. €" min="0" step="10000">
   <label class="est"><input type="checkbox" id="fCompleto" style="width:auto" checked> Solo con rentabilidad</label>
   <label class="est"><input type="checkbox" id="fChollo" style="width:auto"> Solo chollos 🔥</label>
+  <label class="est"><input type="checkbox" id="fObj" style="width:auto"> Solo si cumplen objetivo</label>
   <label class="est"><input type="checkbox" id="fDup" style="width:auto" checked> Ocultar duplicados</label>
   <button class="sec" id="btnCsv">Descargar CSV filtrado</button>
   <span class="cuenta" id="cuenta"></span>
@@ -470,6 +484,11 @@ function celda(col, fila) {
     return "0 %";
   }
   if (col === "per") return (v==null||v==="") ? "" : `${fmtNum(v)} años`;
+  if (col === "precio_objetivo") {
+    if (v==null||v==="") return "";
+    const cls = fila.cumple_objetivo ? "cf-pos" : "";
+    return `<span class="${cls}">${fmtEur(v)}</span>`;
+  }
   if (col === "precio" || col === "precio_m2") return fmtEur(v);
   if (col === "superficie") return (v==null||v==="") ? "" : `${esc(v)} m²`;
   if (col === "alquiler_mensual") {
@@ -511,11 +530,13 @@ function filtradas() {
   const maxPrecio = parseFloat($("#fPrecio").value);
   const soloCompleto = $("#fCompleto").checked;
   const soloChollo = $("#fChollo").checked;
+  const soloObjetivo = $("#fObj").checked;
   const ocultarDup = $("#fDup").checked;
   let f = DATOS.filter(r => {
     if (ocultarDup && r.duplicado) return false;
     if (soloCompleto && !r.completo) return false;
     if (soloChollo && !r.es_chollo) return false;
+    if (soloObjetivo && !r.cumple_objetivo) return false;
     if (zona && r.zona !== zona) return false;
     const neta = (r.rentabilidad_neta==null) ? -Infinity : Number(r.rentabilidad_neta);
     if (neta < minRent) return false;
@@ -607,7 +628,7 @@ function init() {
     orden = {col:c, dir: orden.col===c ? -orden.dir : (NUM.has(c)?-1:1)};
     pintar();
   });
-  ["#buscar","#fZona","#fRent","#fPrecio","#fCompleto","#fChollo","#fDup"].forEach(s => {
+  ["#buscar","#fZona","#fRent","#fPrecio","#fCompleto","#fChollo","#fObj","#fDup"].forEach(s => {
     $(s).addEventListener("input", pintar); $(s).addEventListener("change", pintar);
   });
   $("#btnCsv").addEventListener("click", descargarCsv);

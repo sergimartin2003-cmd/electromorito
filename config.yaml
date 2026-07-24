@@ -219,6 +219,16 @@ horizonte_anios: 10          # años de la proyección
 # rentabilidad neta "pesimista" suponiendo el alquiler ese % más bajo.
 estres_alquiler_pct: 0.10    # 0.10 = alquiler un 10 % más bajo. 0 = desactivado
 
+# Rentabilidad objetivo (opcional). Con un valor > 0 se calcula, para cada piso, el
+# "precio objetivo": a qué precio deberías comprarlo para lograr esa rentabilidad neta.
+# Muy útil para negociar. En el panel puedes filtrar "solo si cumplen objetivo".
+rentabilidad_objetivo: 7     # % de rentabilidad neta que persigues. 0 = desactivado
+
+# Tabla de rentas de referencia integrada (€/m²·mes orientativos por provincia). Se usa
+# para estimar el alquiler cuando la zona no está en tu 'rentas_zona'. Tus valores de
+# 'rentas_zona' siempre mandan. Reemplázala/afínala con datos de SERPAVI. false = no usarla.
+usar_rentas_referencia: true
+
 # --- IA opcional (API de Claude) --------------------------------------
 # Si la activas, para los pisos SIN alquiler indicado se le pide a Claude que
 # estime el alquiler de mercado y detecte riesgos (okupas, derramas, sin ascensor…).

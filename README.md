@@ -243,8 +243,10 @@ salvo las que hagan falta para el cálculo:
 Si no hay `precio`/`superficie`/`habitaciones` en su columna, se intentan **extraer
 del texto** (`descripcion` o `texto`), igual que el `estado` (para reformar, reformado,
 obra nueva…), la `planta` y el `ascensor`. Si falta `alquiler_mensual`, se **estima**
-como `superficie × €/m²·mes` de la zona (tabla `rentas_zona` en `config.yaml`); esos
-pisos se marcan como *(est.)* en el panel.
+como `superficie × €/m²·mes` de la zona (tu tabla `rentas_zona` en `config.yaml` y, para
+las zonas que falten, una **tabla de referencia orientativa integrada** por provincia —
+desactivable con `usar_rentas_referencia: false`); esos pisos se marcan como *(est.)* en
+el panel. Así funciona "de fábrica" aunque no configures nada.
 
 ### El cálculo
 
@@ -255,6 +257,11 @@ pisos se marcan como *(est.)* en el panel.
 Cada piso se clasifica en `excelente` / `buena` / `correcta` / `baja` según su
 rentabilidad neta, y se calcula el **PER** (*price-to-rent*): años en recuperar la
 compra con el alquiler.
+
+**Precio objetivo (para negociar).** Con `rentabilidad_objetivo > 0` (p. ej. 7 %) se
+calcula, para cada piso, **a qué precio deberías comprarlo** para lograr esa
+rentabilidad neta. El panel muestra la columna «Precio objetivo» (en verde si el precio
+actual ya la cumple) y permite filtrar **«solo si cumplen objetivo»**.
 
 **Detección de chollos (comparativa de zona).** Con los pisos del propio fichero se
 calcula la **mediana de €/m² de cada zona** (hace falta al menos 2 pisos en la zona) y
@@ -434,6 +441,7 @@ electromorito/
 │   ├── report.py        # genera el panel HTML navegable
 │   ├── contactos.py     # lista depurada (una fila por organización) para envío
 │   ├── rentabilidad.py  # motor de rentabilidad de pisos (parsers + cálculo)
+│   ├── rentas_referencia.py  # tabla orientativa de €/m²·mes por provincia
 │   ├── pisos.py         # modo --pisos: filtra/ordena pisos y genera su panel HTML
 │   ├── ia.py            # enriquecimiento opcional con IA (API de Claude)
 │   ├── web.py           # interfaz web local del modo --pisos (--web)

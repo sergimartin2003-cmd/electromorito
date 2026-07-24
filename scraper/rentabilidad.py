@@ -45,6 +45,9 @@ class ParametrosRentabilidad:
     horizonte_anios: int = 10
     # Escenario de estrés: % de bajada de alquiler para una rentabilidad "pesimista".
     estres_alquiler_pct: float = 0.0
+    # Rentabilidad neta objetivo (%). Si > 0, se calcula a qué precio compraría cada
+    # piso para alcanzarla (precio objetivo / break-even). 0 = desactivado.
+    rentabilidad_objetivo: float = 0.0
 
 
 # --- Lectura de números tolerante (formato español) ----------------------
@@ -390,6 +393,24 @@ def proyeccion(precio: Optional[float], alquiler_mensual: Optional[float],
     }
 
 
+def precio_objetivo(alquiler_mensual: Optional[float],
+                    rentabilidad_objetivo_pct: float,
+                    params: ParametrosRentabilidad) -> Optional[int]:
+    """Precio de compra al que un piso alcanzaría la rentabilidad neta objetivo (€), o None.
+
+    Despeja el precio en la fórmula de la rentabilidad neta: es el precio máximo que
+    pagarías para que ese alquiler rente el objetivo. Útil para negociar.
+    """
+    if (not alquiler_mensual or alquiler_mensual <= 0
+            or not rentabilidad_objetivo_pct or rentabilidad_objetivo_pct <= 0):
+        return None
+    ingreso_neto_anual = alquiler_mensual * 12 * (1 - params.gastos_pct)
+    denom = rentabilidad_objetivo_pct / 100 * (1 + params.costes_compra_pct)
+    if denom <= 0:
+        return None
+    return int(round(ingreso_neto_anual / denom))
+
+
 def puntuacion(piso: dict, params: ParametrosRentabilidad) -> Optional[int]:
     """Puntuación compuesta 0–100 para ordenar oportunidades (más alto = mejor).
 
@@ -480,6 +501,8 @@ def evaluar_piso(fila: dict, params: ParametrosRentabilidad) -> dict:
     apalancamiento = analizar_apalancamiento(precio, alquiler, params) or {}
     proy = proyeccion(precio, alquiler, params) or {}
     neta_estres = rentabilidad_neta_estres(precio, alquiler, params)
+    objetivo = precio_objetivo(alquiler, params.rentabilidad_objetivo, params)
+    cumple_objetivo = bool(precio and objetivo and precio <= objetivo)
 
     return {
         "titulo": (fila.get("titulo") or fila.get("nombre") or "").strip(),
@@ -507,6 +530,8 @@ def evaluar_piso(fila: dict, params: ParametrosRentabilidad) -> dict:
         "roi_proyectado_pct": proy.get("roi_proyectado_pct"),
         "roi_anual_medio_pct": proy.get("roi_anual_medio_pct"),
         "ganancia_capital": proy.get("ganancia_capital"),
+        "precio_objetivo": objetivo,
+        "cumple_objetivo": cumple_objetivo,
         "clasificacion": clasificar_rentabilidad(neta, params),
         "cuota_hipoteca": apalancamiento.get("cuota_hipoteca"),
         "cash_flow_mensual": apalancamiento.get("cash_flow_mensual"),

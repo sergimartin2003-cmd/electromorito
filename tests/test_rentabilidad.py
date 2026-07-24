@@ -316,6 +316,26 @@ def test_proyeccion_calcula_ganancia_y_roi():
     assert proy["roi_anual_medio_pct"] == round(proy["roi_proyectado_pct"] / 10, 1)
 
 
+def test_precio_objetivo():
+    from scraper.rentabilidad import precio_objetivo
+    p = ParametrosRentabilidad(gastos_pct=0.25, costes_compra_pct=0.11)
+    # Alquiler 900 €/mes para lograr un 7 % neto => comprar por unos 104.247 €
+    assert precio_objetivo(900, 7, p) == 104247
+    assert precio_objetivo(900, 0, p) is None       # objetivo 0 => desactivado
+    assert precio_objetivo(None, 7, p) is None
+
+
+def test_evaluar_piso_cumple_objetivo():
+    p = ParametrosRentabilidad(gastos_pct=0.25, costes_compra_pct=0.11, rentabilidad_objetivo=7)
+    barato = evaluar_piso({"titulo": "Barato", "zona": "Sevilla", "precio": "100000",
+                           "superficie": "60", "alquiler_mensual": "900"}, p)
+    caro = evaluar_piso({"titulo": "Caro", "zona": "Sevilla", "precio": "150000",
+                         "superficie": "60", "alquiler_mensual": "900"}, p)
+    assert barato["precio_objetivo"] == 104247
+    assert barato["cumple_objetivo"] is True         # 100.000 <= 104.247
+    assert caro["cumple_objetivo"] is False           # 150.000 > 104.247
+
+
 def test_evaluar_piso_incluye_estres_y_proyeccion():
     p = ParametrosRentabilidad(gastos_pct=0.25, costes_compra_pct=0.11,
                                revalorizacion_anual=0.02, horizonte_anios=10,

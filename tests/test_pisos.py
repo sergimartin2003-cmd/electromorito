@@ -69,6 +69,28 @@ def test_marca_duplicados():
     assert sum(1 for p in pisos if not p["duplicado"]) == 2
 
 
+def test_rentas_referencia_estima_sin_config():
+    from types import SimpleNamespace
+    from scraper.pisos import procesar_con_config
+    # Sin rentas_zona propias, pero con la tabla de referencia activada (Madrid ~16 €/m²)
+    config = SimpleNamespace(usar_rentas_referencia=True)
+    filas = [{"titulo": "Piso Madrid", "zona": "Madrid", "precio": "250000", "superficie": "90"}]
+    pisos = procesar_con_config(config, filas)
+    assert pisos[0]["alquiler_mensual"] == 1440        # 90 * 16
+    assert pisos[0]["alquiler_estimado"] is True
+    assert pisos[0]["completo"] is True
+
+
+def test_rentas_referencia_desactivable():
+    from types import SimpleNamespace
+    from scraper.pisos import procesar_con_config
+    config = SimpleNamespace(usar_rentas_referencia=False)
+    filas = [{"titulo": "Piso Madrid", "zona": "Madrid", "precio": "250000", "superficie": "90"}]
+    pisos = procesar_con_config(config, filas)
+    assert pisos[0]["alquiler_mensual"] is None        # sin tabla y sin alquiler => no se estima
+    assert pisos[0]["completo"] is False
+
+
 def test_cargar_xlsx(tmp_path):
     import pytest
     Workbook = pytest.importorskip("openpyxl").Workbook
