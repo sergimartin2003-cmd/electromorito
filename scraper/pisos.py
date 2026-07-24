@@ -135,6 +135,34 @@ def _marcar_duplicados(pisos: List[dict]) -> None:
             vistos.add(clave)
 
 
+def parsear_texto(texto: str) -> List[dict]:
+    """Convierte un texto pegado (CSV o JSON) en una lista de anuncios (dicts)."""
+    texto = (texto or "").strip()
+    if not texto:
+        return []
+    if texto[0] in "[{":
+        datos = json.loads(texto)
+        if isinstance(datos, dict):
+            datos = datos.get("pisos") or datos.get("anuncios") or []
+        return [d for d in datos if isinstance(d, dict)]
+    import io
+    filas: List[dict] = []
+    for fila in csv.DictReader(io.StringIO(texto)):
+        filas.append({(k or "").strip(): v for k, v in fila.items()})
+    return filas
+
+
+def procesar_con_config(config, filas: List[dict]) -> List[dict]:
+    """Evalúa los anuncios usando los parámetros del config (incluida la IA si está activa)."""
+    params = parametros_desde_config(config)
+    if getattr(config, "usar_ia", False):
+        from .ia import enriquecer_pisos
+        enriquecer_pisos(filas, params,
+                         modelo=getattr(config, "modelo_ia", "claude-opus-4-8"),
+                         log=lambda *_: None)
+    return procesar_pisos(filas, params)
+
+
 def procesar_pisos(filas: List[dict], params: ParametrosRentabilidad) -> List[dict]:
     """Evalúa cada anuncio y devuelve la lista ordenada por puntuación (desc.).
 
@@ -208,8 +236,8 @@ _COLS_NUM = [
 ]
 
 
-def generar_informe_pisos(pisos: List[dict], ruta_html: str) -> str:
-    """Crea un panel HTML autónomo (filtrar/ordenar/abrir anuncio) y devuelve su ruta."""
+def construir_html_pisos(pisos: List[dict]) -> str:
+    """Devuelve el panel HTML autónomo (como cadena) para la lista de pisos evaluados."""
     con_hipoteca = any(p.get("cuota_hipoteca") is not None for p in pisos)
     con_estres = any(p.get("rentabilidad_neta_estres") is not None for p in pisos)
     con_proy = any(p.get("roi_anual_medio_pct") is not None for p in pisos)
@@ -222,14 +250,18 @@ def generar_informe_pisos(pisos: List[dict], ruta_html: str) -> str:
             + _COLS_FIN)
 
     datos = json.dumps(pisos, ensure_ascii=False).replace("</", "<\\/")
-    salida = (
+    return (
         _PLANTILLA
         .replace("/*__DATOS__*/null", datos)
         .replace("/*__COLS__*/null", json.dumps(cols, ensure_ascii=False))
         .replace("/*__NUMCOLS__*/null", json.dumps(_COLS_NUM))
     )
+
+
+def generar_informe_pisos(pisos: List[dict], ruta_html: str) -> str:
+    """Crea un panel HTML autónomo (filtrar/ordenar/abrir anuncio) y devuelve su ruta."""
     with open(ruta_html, "w", encoding="utf-8") as f:
-        f.write(salida)
+        f.write(construir_html_pisos(pisos))
     return ruta_html
 
 

@@ -300,6 +300,21 @@ O de forma permanente en `config.yaml` con `usar_ia: true`. Solo se llama a la I
 los pisos sin alquiler indicado (para acotar el coste); el modelo se configura con
 `modelo_ia` (por defecto `claude-opus-4-8`).
 
+### Interfaz web (opcional)
+
+Si prefieres no usar la terminal, hay una **interfaz web local** (sin dependencias
+extra, solo la librería estándar):
+
+```bash
+python run.py --web            # abre http://127.0.0.1:8000
+python run.py --web --puerto 8080 --ia   # otro puerto y con IA
+```
+
+Abre esa dirección en el navegador, **pega tus anuncios** (CSV o JSON) y pulsa
+«Analizar»: te devuelve el mismo panel de rentabilidad, ordenado y con enlace a cada
+anuncio. No expone nada a internet (escucha solo en tu ordenador) y usa los mismos
+ajustes de `config.yaml` (zonas, hipoteca, IA…).
+
 **Con hipoteca (apalancamiento).** Si en `config.yaml` pones `financiacion_pct > 0`,
 además se calcula, para cada piso:
 
@@ -420,6 +435,7 @@ electromorito/
 │   ├── rentabilidad.py  # motor de rentabilidad de pisos (parsers + cálculo)
 │   ├── pisos.py         # modo --pisos: filtra/ordena pisos y genera su panel HTML
 │   ├── ia.py            # enriquecimiento opcional con IA (API de Claude)
+│   ├── web.py           # interfaz web local del modo --pisos (--web)
 │   ├── runner.py        # orquesta todo el proceso
 │   └── util.py          # utilidades (dominios, pausas, DNS, espera adaptativa)
 ├── pisos_ejemplo.csv    # anuncios de ejemplo para  python run.py --pisos

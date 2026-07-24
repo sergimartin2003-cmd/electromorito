@@ -66,8 +66,16 @@ def main() -> None:
     )
     parser.add_argument(
         "--ia", action="store_true",
-        help="Con --pisos: usa la IA (API de Claude) para estimar el alquiler y detectar "
-             "riesgos en los pisos que no traen alquiler.",
+        help="Con --pisos (o --web): usa la IA (API de Claude) para estimar el alquiler y "
+             "detectar riesgos en los pisos que no traen alquiler.",
+    )
+    parser.add_argument(
+        "--web", action="store_true",
+        help="Abre una interfaz web local: pega los anuncios y obtén el ranking de rentabilidad.",
+    )
+    parser.add_argument(
+        "--puerto", type=int, default=8000, metavar="N",
+        help="Puerto para la interfaz web (por defecto 8000).",
     )
     parser.add_argument(
         "--navegador", default=None, metavar="RUTA",
@@ -88,9 +96,15 @@ def main() -> None:
     if args.navegador:
         config.ruta_navegador = args.navegador
 
+    if args.ia:
+        config.usar_ia = True
+
+    if args.web:
+        from .web import iniciar_servidor
+        iniciar_servidor(config, puerto=args.puerto)
+        return
+
     if args.pisos:
-        if args.ia:
-            config.usar_ia = True
         from .pisos import ejecutar_pisos
         ejecutar_pisos(config, args.pisos)
         return
