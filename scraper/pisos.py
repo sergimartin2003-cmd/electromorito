@@ -550,6 +550,19 @@ _PLANTILLA = r"""<!doctype html>
   .tile .val { font-size:20px; font-weight:800; font-variant-numeric:tabular-nums; margin-top:2px; }
   tr.dup td { opacity:.5; font-style:italic; }
   .riesgo { display:inline-block; white-space:normal; max-width:280px; color:var(--cor); font-size:13px; }
+  th.chk, td.chk { width:28px; text-align:center; padding-left:14px; }
+  td.chk input, th.chk input { cursor:pointer; }
+  #comparador { padding:0 22px; }
+  .cmp-card { background:var(--card); border:1px solid var(--bd); border-radius:10px;
+              padding:14px; margin-top:12px; overflow-x:auto; }
+  .cmp-card h3 { margin:0 0 10px; font-size:13px; font-weight:700; text-transform:uppercase;
+                 letter-spacing:.03em; color:var(--muted); display:flex; align-items:center; }
+  .cmp-tabla { border-collapse:collapse; }
+  .cmp-tabla th, .cmp-tabla td { border-bottom:1px solid var(--bd); padding:6px 12px;
+                                 text-align:right; white-space:nowrap; font-size:13px;
+                                 font-variant-numeric:tabular-nums; }
+  .cmp-tabla thead th { text-align:center; font-weight:700; max-width:170px; white-space:normal; }
+  .cmp-tabla th.met { text-align:left; color:var(--muted); font-weight:600; }
 </style>
 </head>
 <body>
@@ -563,6 +576,7 @@ _PLANTILLA = r"""<!doctype html>
 </header>
 <div class="tiles" id="tiles"></div>
 <div class="graficos" id="graficos"></div>
+<div id="comparador"></div>
 <div class="controles">
   <input type="search" id="buscar" placeholder="Buscar título, zona…">
   <select id="fZona"><option value="">Todas las zonas</option></select>
@@ -594,6 +608,7 @@ const COLS = /*__COLS__*/null;
 const NUM = new Set(/*__NUMCOLS__*/null);
 let orden = {col:"puntuacion", dir:-1};
 let metricaMapa = "neta";
+const sel = new Set();   // índices (en DATOS) de los pisos marcados para comparar
 
 const $ = s => document.querySelector(s);
 const esc = s => (s==null?"":String(s)).replace(/[&<>"]/g, c => (
@@ -883,10 +898,48 @@ function dibujar_graficos(filas) {
     `<div class="grafico"><h3>Precio vs. rentabilidad neta${chollos ? " · 🔥 chollo" : ""}</h3>${svgDispersion(conRent)}</div>`;
 }
 
+const CMP = [
+  ["Zona","zona",v=>esc(v)],["Precio","precio",fmtEur],
+  ["Superficie","superficie",v=>esc(v)+" m²"],["€/m²","precio_m2",fmtEur],
+  ["Hab.","habitaciones",v=>esc(v)],["Estado","estado",v=>esc(v)],
+  ["vs. zona","descuento_zona",v=>fmtNum(v)+" %"],
+  ["Alquiler/mes","alquiler_mensual",fmtEur],
+  ["Rent. bruta","rentabilidad_bruta",fmtPct],["Rent. neta","rentabilidad_neta",fmtPct],
+  ["Rent. tras IRPF","rentabilidad_neta_impuestos",fmtPct],
+  ["Cash-flow/mes","cash_flow_mensual",fmtEur],
+  ["Rent. s/ fondos","rentabilidad_fondos_propios",fmtPct],
+  ["PER (años)","per",v=>fmtNum(v)+" años"],
+  ["Precio objetivo","precio_objetivo",fmtEur],["Puntuación","puntuacion",v=>esc(v)],
+];
+
+function renderComparador() {
+  const cont = $("#comparador");
+  const pisos = [...sel].map(i => DATOS[i]).filter(Boolean);
+  if (!pisos.length) { cont.innerHTML = ""; return; }
+  let h = `<div class="cmp-card"><h3>Comparador (${pisos.length})`+
+          `<button class="sec" id="cmpLimpiar" style="margin-left:10px">Limpiar</button></h3>`+
+          `<table class="cmp-tabla"><thead><tr><th class="met"></th>`;
+  pisos.forEach(p => h += `<th>${esc((p.titulo||"(sin título)").slice(0,32))}${p.es_chollo?" 🔥":""}</th>`);
+  h += `</tr></thead><tbody>`;
+  CMP.forEach(([lab,key,fmt]) => {
+    if (!pisos.some(p => p[key]!=null && p[key]!=="")) return;
+    h += `<tr><th class="met">${lab}</th>`;
+    pisos.forEach(p => h += `<td>${(p[key]==null||p[key]==="") ? "—" : fmt(p[key])}</td>`);
+    h += `</tr>`;
+  });
+  h += `<tr><th class="met">Anuncio</th>`;
+  pisos.forEach(p => h += `<td>${p.url?`<a href="${esc(p.url)}" target="_blank" rel="noopener">ver →</a>`:"—"}</td>`);
+  h += `</tr></tbody></table></div>`;
+  cont.innerHTML = h;
+  $("#cmpLimpiar").onclick = () => { sel.clear(); renderComparador(); pintar(); };
+}
+
 function pintar() {
   const filas = filtradas();
   $("#cuerpo").innerHTML = filas.map(r =>
-    `<tr class="${r.duplicado ? 'dup' : ''}">` + COLS.map(([c]) => {
+    `<tr class="${r.duplicado ? 'dup' : ''}">`+
+    `<td class="chk"><input type="checkbox" class="cmp" data-i="${r._i}"${sel.has(r._i)?" checked":""}></td>` +
+    COLS.map(([c]) => {
       const clase = c==="titulo" ? "tit" : (NUM.has(c) ? "num" : "");
       return `<td class="${clase}">${celda(c,r)}</td>`;
     }).join("") + "</tr>"
@@ -920,13 +973,22 @@ function descargarCsv() {
 
 function init() {
   const completos = DATOS.filter(r => r.completo).length;
+  DATOS.forEach((r,i) => r._i = i);
   $("#resumen").textContent = `${DATOS.length} anuncios · ${completos} con rentabilidad calculada`;
-  $("#cabecera").innerHTML = COLS.map(([c,t]) => `<th data-col="${c}">${t}</th>`).join("");
+  $("#cabecera").innerHTML = `<th class="chk" title="Comparar"></th>` +
+    COLS.map(([c,t]) => `<th data-col="${c}">${t}</th>`).join("");
   opciones("#fZona", DATOS.map(r => r.zona));
-  $("#cabecera").querySelectorAll("th").forEach(th => th.onclick = () => {
+  $("#cabecera").querySelectorAll("th[data-col]").forEach(th => th.onclick = () => {
     const c = th.dataset.col;
     orden = {col:c, dir: orden.col===c ? -orden.dir : (NUM.has(c)?-1:1)};
     pintar();
+  });
+  $("#cuerpo").addEventListener("change", e => {
+    const c = e.target.closest(".cmp");
+    if (!c) return;
+    const i = Number(c.getAttribute("data-i"));
+    if (c.checked) sel.add(i); else sel.delete(i);
+    renderComparador();
   });
   ["#buscar","#fZona","#fRent","#fPrecio","#fCompleto","#fChollo","#fObj","#fDup"].forEach(s => {
     $(s).addEventListener("input", pintar); $(s).addEventListener("change", pintar);

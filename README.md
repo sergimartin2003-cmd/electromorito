@@ -372,7 +372,12 @@ burbuja por zona (tamaño = nº de pisos, color = rentabilidad neta media; **cli
 zona para filtrar**) y dos **gráficos** —«Pisos por valoración» y «Precio vs.
 rentabilidad neta» con los chollos resaltados—. Todo se **recalcula al filtrar**, y hay
 un botón para **descargar el CSV ya filtrado**. El mapa es SVG en línea (sin mapas
-externos): sitúa cada piso por su `zona` con coordenadas de provincias/capitales. Las rentabilidades son **estimaciones**
+externos): sitúa cada piso por su `zona` con coordenadas de provincias/capitales.
+
+Además, marcando la **casilla** de la izquierda de cada fila se activa un **comparador**
+que enfrenta los pisos elegidos métrica a métrica (precio, €/m², rentabilidades, cash-flow,
+tras IRPF, precio objetivo, puntuación…) con enlace a cada anuncio; la selección se
+mantiene aunque filtres u ordenes. Las rentabilidades son **estimaciones**
 a partir de los datos del anuncio y de los supuestos configurados: verifícalas antes de decidir.
 
 ---
