@@ -284,3 +284,45 @@ def test_puntuacion_penaliza_reformar_y_estimado():
 
 def test_puntuacion_none_sin_rentabilidad():
     assert puntuacion({"rentabilidad_neta": None}, PARAMS) is None
+
+
+# --- Escenario de estrés y proyección ------------------------------------
+def test_rentabilidad_neta_estres_es_menor():
+    p = ParametrosRentabilidad(gastos_pct=0.25, costes_compra_pct=0.11, estres_alquiler_pct=0.10)
+    from scraper.rentabilidad import rentabilidad_neta_estres
+    normal = rentabilidad_neta(180000, 900, p)
+    estres = rentabilidad_neta_estres(180000, 900, p)
+    assert estres < normal
+
+
+def test_estres_desactivado_es_none():
+    from scraper.rentabilidad import rentabilidad_neta_estres
+    assert rentabilidad_neta_estres(180000, 900, PARAMS) is None
+
+
+def test_proyeccion_desactivada_es_none():
+    from scraper.rentabilidad import proyeccion
+    assert proyeccion(180000, 900, PARAMS) is None
+
+
+def test_proyeccion_calcula_ganancia_y_roi():
+    from scraper.rentabilidad import proyeccion
+    p = ParametrosRentabilidad(gastos_pct=0.25, costes_compra_pct=0.11,
+                               revalorizacion_anual=0.02, horizonte_anios=10)
+    proy = proyeccion(200000, 1000, p)
+    # 200.000 € al 2% anual durante 10 años => +43.799 € de ganancia de capital
+    assert proy["ganancia_capital"] == 43799
+    assert proy["roi_proyectado_pct"] is not None
+    assert proy["roi_anual_medio_pct"] == round(proy["roi_proyectado_pct"] / 10, 1)
+
+
+def test_evaluar_piso_incluye_estres_y_proyeccion():
+    p = ParametrosRentabilidad(gastos_pct=0.25, costes_compra_pct=0.11,
+                               revalorizacion_anual=0.02, horizonte_anios=10,
+                               estres_alquiler_pct=0.10)
+    piso = evaluar_piso({"titulo": "X", "zona": "Sevilla", "precio": "180000",
+                         "superficie": "90", "alquiler_mensual": "900"}, p)
+    assert piso["rentabilidad_neta_estres"] is not None
+    assert piso["rentabilidad_neta_estres"] < piso["rentabilidad_neta"]
+    assert piso["roi_anual_medio_pct"] is not None
+    assert piso["ganancia_capital"] > 0

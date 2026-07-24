@@ -221,8 +221,9 @@ vuelta a cada anuncio** (así "mandas a la gente a la web" del portal original).
 python run.py --pisos pisos_ejemplo.csv
 ```
 
-La entrada es un **CSV** (una fila por piso) o un **JSON** (lista de objetos) con
-estas columnas —todas opcionales salvo las que hagan falta para el cálculo:
+La entrada es un **CSV** (una fila por piso), un **JSON** (lista de objetos) o un
+**XLSX** (primera hoja, primera fila = cabecera) con estas columnas —todas opcionales
+salvo las que hagan falta para el cálculo:
 
 | Columna | Para qué |
 |---|---|
@@ -263,6 +264,19 @@ puntuación que combina, de forma transparente: rentabilidad neta (hasta 60 pts)
 descuento respecto a la mediana de su zona (hasta 25 pts) y calidad (hasta 15 pts,
 restando por estar *a reformar* o tener el alquiler estimado). El panel se ordena por
 ella por defecto.
+
+**Escenario de estrés (opcional).** Con `estres_alquiler_pct > 0` se calcula una
+rentabilidad neta *pesimista* suponiendo el alquiler ese % más bajo: un test de
+resistencia rápido ante bajadas de renta o más vacancia.
+
+**Proyección a futuro (opcional).** Con `revalorizacion_anual > 0` se estima, a
+`horizonte_anios`, la ganancia por revalorización del precio y el **ROI proyectado**
+(revalorización + flujo del alquiler sobre el dinero invertido). Es una proyección
+simplificada y conservadora (ignora la amortización del principal y los costes de venta).
+
+**Duplicados.** Si el mismo piso aparece repetido (misma zona, precio y superficie —
+p. ej. anunciado en varios portales), se detecta y se conserva solo el mejor; el panel
+los oculta por defecto (hay una casilla para mostrarlos).
 
 **Con hipoteca (apalancamiento).** Si en `config.yaml` pones `financiacion_pct > 0`,
 además se calcula, para cada piso:

@@ -4,6 +4,7 @@ import csv
 
 from scraper.pisos import (
     CAMPOS_PISOS,
+    cargar_pisos,
     escribir_csv,
     generar_informe_pisos,
     procesar_pisos,
@@ -50,6 +51,38 @@ def test_sin_comparables_no_marca_chollo():
     pisos = procesar_pisos(filas, PARAMS)
     assert pisos[0]["descuento_zona"] is None
     assert pisos[0]["es_chollo"] is False
+
+
+def test_marca_duplicados():
+    filas = [
+        {"titulo": "Piso A (portal 1)", "url": "u1", "zona": "Madrid",
+         "precio": "200000", "superficie": "80", "alquiler_mensual": "1000"},
+        {"titulo": "Piso A (portal 2)", "url": "u2", "zona": "Madrid",
+         "precio": "200000", "superficie": "80", "alquiler_mensual": "1000"},
+        {"titulo": "Otro piso", "url": "u3", "zona": "Madrid",
+         "precio": "150000", "superficie": "70", "alquiler_mensual": "900"},
+    ]
+    pisos = procesar_pisos(filas, PARAMS)
+    duplicados = [p for p in pisos if p["duplicado"]]
+    # De los dos anuncios del mismo piso, solo uno se marca como duplicado
+    assert len(duplicados) == 1
+    assert sum(1 for p in pisos if not p["duplicado"]) == 2
+
+
+def test_cargar_xlsx(tmp_path):
+    import pytest
+    Workbook = pytest.importorskip("openpyxl").Workbook
+    wb = Workbook()
+    ws = wb.active
+    ws.append(["titulo", "zona", "precio", "superficie", "alquiler_mensual"])
+    ws.append(["Piso Excel", "Madrid", 200000, 80, 1000])
+    ruta = tmp_path / "pisos.xlsx"
+    wb.save(ruta)
+
+    filas = cargar_pisos(str(ruta))
+    assert len(filas) == 1
+    assert filas[0]["titulo"] == "Piso Excel"
+    assert filas[0]["precio"] == 200000
 
 
 def test_escribir_csv(tmp_path):

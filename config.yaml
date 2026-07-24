@@ -210,6 +210,15 @@ anios_hipoteca: 25        # plazo de la hipoteca en años
 # hacen falta al menos 2 pisos en la zona para comparar).
 umbral_chollo: 10         # % por debajo de la mediana de la zona
 
+# Proyección a futuro (opcional). Con revalorizacion_anual > 0 se calcula, para cada
+# piso, la ganancia por revalorización y el ROI proyectado a 'horizonte_anios'.
+revalorizacion_anual: 0.02   # revalorización anual estimada del precio (0.02 = 2 %). 0 = desactivado
+horizonte_anios: 10          # años de la proyección
+
+# Escenario de estrés (opcional). Con estres_alquiler_pct > 0 se calcula una
+# rentabilidad neta "pesimista" suponiendo el alquiler ese % más bajo.
+estres_alquiler_pct: 0.10    # 0.10 = alquiler un 10 % más bajo. 0 = desactivado
+
 # Alquiler de referencia en €/m²/mes por zona. Sirve para ESTIMAR el alquiler
 # cuando el anuncio de venta no lo trae. Pon valores reales de tu mercado.
 # La zona del anuncio se empareja de forma flexible (la clave más específica gana).

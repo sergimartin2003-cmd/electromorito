@@ -31,9 +31,10 @@ CAMPOS_PISOS = [
     "titulo", "zona", "precio", "superficie", "precio_m2", "mediana_zona_m2",
     "descuento_zona", "es_chollo", "habitaciones", "estado", "planta", "ascensor",
     "terraza", "garaje", "exterior", "alquiler_mensual", "alquiler_estimado",
-    "rentabilidad_bruta", "rentabilidad_neta", "per", "clasificacion",
+    "rentabilidad_bruta", "rentabilidad_neta", "rentabilidad_neta_estres", "per",
+    "roi_proyectado_pct", "roi_anual_medio_pct", "ganancia_capital", "clasificacion",
     "cuota_hipoteca", "cash_flow_mensual", "rentabilidad_fondos_propios",
-    "fondos_propios", "puntuacion", "url", "fecha",
+    "fondos_propios", "puntuacion", "duplicado", "url", "fecha",
 ]
 
 
@@ -47,11 +48,32 @@ def parametros_desde_config(config) -> ParametrosRentabilidad:
         interes_hipoteca=getattr(config, "interes_hipoteca", 0.03),
         anios_hipoteca=getattr(config, "anios_hipoteca", 25),
         umbral_chollo=getattr(config, "umbral_chollo", 10.0),
+        revalorizacion_anual=getattr(config, "revalorizacion_anual", 0.0),
+        horizonte_anios=getattr(config, "horizonte_anios", 10),
+        estres_alquiler_pct=getattr(config, "estres_alquiler_pct", 0.0),
     )
 
 
+def _leer_xlsx(ruta: str) -> List[dict]:
+    """Lee un .xlsx (primera hoja, primera fila = cabecera) como lista de dicts."""
+    from openpyxl import load_workbook
+    wb = load_workbook(ruta, read_only=True, data_only=True)
+    ws = wb.active
+    filas_iter = ws.iter_rows(values_only=True)
+    try:
+        cabecera = [str(c).strip() if c is not None else "" for c in next(filas_iter)]
+    except StopIteration:
+        return []
+    filas: List[dict] = []
+    for fila in filas_iter:
+        d = {cabecera[i]: fila[i] for i in range(min(len(cabecera), len(fila))) if cabecera[i]}
+        if any(v not in (None, "") for v in d.values()):
+            filas.append(d)
+    return filas
+
+
 def cargar_pisos(ruta: str) -> List[dict]:
-    """Lee los anuncios desde un CSV (una fila por piso) o un JSON (lista de objetos)."""
+    """Lee los anuncios desde un CSV (una fila por piso), un JSON (lista) o un XLSX."""
     if not os.path.exists(ruta):
         raise FileNotFoundError(f"No se encuentra el archivo de pisos '{ruta}'.")
     if ruta.lower().endswith(".json"):
@@ -60,6 +82,8 @@ def cargar_pisos(ruta: str) -> List[dict]:
         if isinstance(datos, dict):
             datos = datos.get("pisos") or datos.get("anuncios") or []
         return [d for d in datos if isinstance(d, dict)]
+    if ruta.lower().endswith((".xlsx", ".xlsm")):
+        return _leer_xlsx(ruta)
     filas: List[dict] = []
     with open(ruta, "r", encoding="utf-8-sig", newline="") as f:
         for fila in csv.DictReader(f):
@@ -91,10 +115,30 @@ def _anotar_zona(pisos: List[dict], params: ParametrosRentabilidad) -> None:
         p["puntuacion"] = puntuacion(p, params)
 
 
+def _clave_dedup(p: dict) -> Optional[str]:
+    """Clave para detectar el mismo piso repetido (misma zona, precio y superficie)."""
+    precio, sup = p.get("precio"), p.get("superficie")
+    if precio and sup:
+        return f"{_normalizar(p.get('zona', ''))}|{precio}|{round(sup)}"
+    titulo = _normalizar(p.get("titulo", ""))
+    return titulo or None
+
+
+def _marcar_duplicados(pisos: List[dict]) -> None:
+    """Marca como duplicado (en el sitio) todo piso repetido salvo el primero (el mejor)."""
+    vistos: set = set()
+    for p in pisos:  # ya vienen ordenados de mejor a peor
+        clave = _clave_dedup(p)
+        p["duplicado"] = bool(clave and clave in vistos)
+        if clave:
+            vistos.add(clave)
+
+
 def procesar_pisos(filas: List[dict], params: ParametrosRentabilidad) -> List[dict]:
     """Evalúa cada anuncio y devuelve la lista ordenada por puntuación (desc.).
 
     Los pisos sin datos suficientes para calcular la rentabilidad quedan al final.
+    Marca duplicados (mismo piso repetido) conservando el mejor de cada grupo.
     """
     evaluados = [evaluar_piso(fila, params) for fila in filas]
     _anotar_zona(evaluados, params)
@@ -111,6 +155,7 @@ def procesar_pisos(filas: List[dict], params: ParametrosRentabilidad) -> List[di
         )
 
     evaluados.sort(key=_clave, reverse=True)
+    _marcar_duplicados(evaluados)
     return evaluados
 
 
@@ -145,6 +190,8 @@ _COLS_BASE = [
     ("rentabilidad_neta", "Rent. neta"), ("per", "PER (años)"),
     ("clasificacion", "Valoración"),
 ]
+_COLS_ESTRES = [("rentabilidad_neta_estres", "Rent. neta (estrés)")]
+_COLS_PROY = [("roi_anual_medio_pct", "ROI medio/año")]
 _COLS_HIPOTECA = [
     ("cuota_hipoteca", "Cuota/mes"), ("cash_flow_mensual", "Cash-flow/mes"),
     ("rentabilidad_fondos_propios", "Rent. s/ fondos"),
@@ -153,7 +200,8 @@ _COLS_FIN = [("url", "Anuncio")]
 _COLS_NUM = [
     "puntuacion", "precio", "superficie", "precio_m2", "mediana_zona_m2",
     "descuento_zona", "habitaciones", "alquiler_mensual", "rentabilidad_bruta",
-    "rentabilidad_neta", "per", "cuota_hipoteca", "cash_flow_mensual",
+    "rentabilidad_neta", "rentabilidad_neta_estres", "per", "roi_anual_medio_pct",
+    "roi_proyectado_pct", "ganancia_capital", "cuota_hipoteca", "cash_flow_mensual",
     "rentabilidad_fondos_propios", "fondos_propios",
 ]
 
@@ -161,7 +209,13 @@ _COLS_NUM = [
 def generar_informe_pisos(pisos: List[dict], ruta_html: str) -> str:
     """Crea un panel HTML autónomo (filtrar/ordenar/abrir anuncio) y devuelve su ruta."""
     con_hipoteca = any(p.get("cuota_hipoteca") is not None for p in pisos)
-    cols = _COLS_BASE + (_COLS_HIPOTECA if con_hipoteca else []) + _COLS_FIN
+    con_estres = any(p.get("rentabilidad_neta_estres") is not None for p in pisos)
+    con_proy = any(p.get("roi_anual_medio_pct") is not None for p in pisos)
+    cols = (_COLS_BASE
+            + (_COLS_ESTRES if con_estres else [])
+            + (_COLS_PROY if con_proy else [])
+            + (_COLS_HIPOTECA if con_hipoteca else [])
+            + _COLS_FIN)
 
     datos = json.dumps(pisos, ensure_ascii=False).replace("</", "<\\/")
     salida = (
@@ -294,6 +348,7 @@ _PLANTILLA = r"""<!doctype html>
           padding:10px 14px; min-width:120px; }
   .tile .k { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.03em; }
   .tile .val { font-size:20px; font-weight:800; font-variant-numeric:tabular-nums; margin-top:2px; }
+  tr.dup td { opacity:.5; font-style:italic; }
 </style>
 </head>
 <body>
@@ -320,6 +375,7 @@ _PLANTILLA = r"""<!doctype html>
   <input type="number" id="fPrecio" placeholder="Precio máx. €" min="0" step="10000">
   <label class="est"><input type="checkbox" id="fCompleto" style="width:auto" checked> Solo con rentabilidad</label>
   <label class="est"><input type="checkbox" id="fChollo" style="width:auto"> Solo chollos 🔥</label>
+  <label class="est"><input type="checkbox" id="fDup" style="width:auto" checked> Ocultar duplicados</label>
   <button class="sec" id="btnCsv">Descargar CSV filtrado</button>
   <span class="cuenta" id="cuenta"></span>
 </div>
@@ -376,6 +432,7 @@ function celda(col, fila) {
     return fmtEur(v) + est;
   }
   if (col === "rentabilidad_bruta") return fmtPct(v);
+  if (col === "rentabilidad_neta_estres" || col === "roi_anual_medio_pct") return fmtPct(v);
   if (col === "rentabilidad_neta") return v==null ? "" : `<span class="neta">${fmtPct(v)}</span>`;
   if (col === "rentabilidad_fondos_propios") return v==null ? "" : `<span class="neta">${fmtPct(v)}</span>`;
   if (col === "cuota_hipoteca") return fmtEur(v);
@@ -403,7 +460,9 @@ function filtradas() {
   const maxPrecio = parseFloat($("#fPrecio").value);
   const soloCompleto = $("#fCompleto").checked;
   const soloChollo = $("#fChollo").checked;
+  const ocultarDup = $("#fDup").checked;
   let f = DATOS.filter(r => {
+    if (ocultarDup && r.duplicado) return false;
     if (soloCompleto && !r.completo) return false;
     if (soloChollo && !r.es_chollo) return false;
     if (zona && r.zona !== zona) return false;
@@ -456,7 +515,7 @@ function tiles(filas) {
 function pintar() {
   const filas = filtradas();
   $("#cuerpo").innerHTML = filas.map(r =>
-    "<tr>" + COLS.map(([c]) => {
+    `<tr class="${r.duplicado ? 'dup' : ''}">` + COLS.map(([c]) => {
       const clase = c==="titulo" ? "tit" : (NUM.has(c) ? "num" : "");
       return `<td class="${clase}">${celda(c,r)}</td>`;
     }).join("") + "</tr>"
@@ -497,7 +556,7 @@ function init() {
     orden = {col:c, dir: orden.col===c ? -orden.dir : (NUM.has(c)?-1:1)};
     pintar();
   });
-  ["#buscar","#fZona","#fRent","#fPrecio","#fCompleto","#fChollo"].forEach(s => {
+  ["#buscar","#fZona","#fRent","#fPrecio","#fCompleto","#fChollo","#fDup"].forEach(s => {
     $(s).addEventListener("input", pintar); $(s).addEventListener("change", pintar);
   });
   $("#btnCsv").addEventListener("click", descargarCsv);

@@ -40,6 +40,11 @@ class ParametrosRentabilidad:
     anios_hipoteca: int = 25
     # % por debajo de la mediana de €/m² de su zona para marcar un piso como "chollo".
     umbral_chollo: float = 10.0
+    # Proyección a futuro: revalorización anual del precio y horizonte en años.
+    revalorizacion_anual: float = 0.0
+    horizonte_anios: int = 10
+    # Escenario de estrés: % de bajada de alquiler para una rentabilidad "pesimista".
+    estres_alquiler_pct: float = 0.0
 
 
 # --- Lectura de números tolerante (formato español) ----------------------
@@ -343,6 +348,48 @@ def price_to_rent(precio: Optional[float],
     return round(precio / (alquiler_mensual * 12), 1)
 
 
+def rentabilidad_neta_estres(precio: Optional[float], alquiler_mensual: Optional[float],
+                             params: ParametrosRentabilidad) -> Optional[float]:
+    """Rentabilidad neta en un escenario pesimista (alquiler un `estres_alquiler_pct` más bajo)."""
+    if not params.estres_alquiler_pct or params.estres_alquiler_pct <= 0:
+        return None
+    if not alquiler_mensual or alquiler_mensual <= 0:
+        return None
+    return rentabilidad_neta(precio, alquiler_mensual * (1 - params.estres_alquiler_pct), params)
+
+
+def proyeccion(precio: Optional[float], alquiler_mensual: Optional[float],
+               params: ParametrosRentabilidad) -> Optional[dict]:
+    """Proyección simplificada a `horizonte_anios`: ganancia por revalorización + ROI.
+
+    Suma la ganancia de capital por la revalorización del precio y el flujo neto
+    acumulado del alquiler (con hipoteca, el cash-flow tras cuota), sobre el dinero
+    invertido. Es conservadora: ignora la amortización del principal y los costes de
+    venta. Devuelve None si no hay revalorización configurada o faltan datos.
+    """
+    if (not precio or precio <= 0 or not alquiler_mensual or alquiler_mensual <= 0
+            or not params.revalorizacion_anual or params.revalorizacion_anual <= 0):
+        return None
+    n = params.horizonte_anios or 10
+    ganancia_capital = precio * ((1 + params.revalorizacion_anual) ** n - 1)
+
+    apal = analizar_apalancamiento(precio, alquiler_mensual, params)
+    if apal:
+        inversion = apal["fondos_propios"]
+        flujo_anual = apal["cash_flow_anual"]
+    else:
+        inversion = precio * (1 + params.costes_compra_pct)
+        flujo_anual = alquiler_mensual * 12 * (1 - params.gastos_pct)
+
+    flujo_acumulado = flujo_anual * n
+    roi_total = (ganancia_capital + flujo_acumulado) / inversion * 100 if inversion > 0 else None
+    return {
+        "ganancia_capital": round(ganancia_capital),
+        "roi_proyectado_pct": round(roi_total, 1) if roi_total is not None else None,
+        "roi_anual_medio_pct": round(roi_total / n, 1) if roi_total is not None else None,
+    }
+
+
 def puntuacion(piso: dict, params: ParametrosRentabilidad) -> Optional[int]:
     """Puntuación compuesta 0–100 para ordenar oportunidades (más alto = mejor).
 
@@ -430,6 +477,8 @@ def evaluar_piso(fila: dict, params: ParametrosRentabilidad) -> dict:
     exterior = _campo_bool("exterior", es_exterior)
 
     apalancamiento = analizar_apalancamiento(precio, alquiler, params) or {}
+    proy = proyeccion(precio, alquiler, params) or {}
+    neta_estres = rentabilidad_neta_estres(precio, alquiler, params)
 
     return {
         "titulo": (fila.get("titulo") or fila.get("nombre") or "").strip(),
@@ -452,7 +501,11 @@ def evaluar_piso(fila: dict, params: ParametrosRentabilidad) -> dict:
         "alquiler_estimado": estimado,
         "rentabilidad_bruta": round(bruta, 2) if bruta is not None else None,
         "rentabilidad_neta": round(neta, 2) if neta is not None else None,
+        "rentabilidad_neta_estres": round(neta_estres, 2) if neta_estres is not None else None,
         "per": price_to_rent(precio, alquiler),
+        "roi_proyectado_pct": proy.get("roi_proyectado_pct"),
+        "roi_anual_medio_pct": proy.get("roi_anual_medio_pct"),
+        "ganancia_capital": proy.get("ganancia_capital"),
         "clasificacion": clasificar_rentabilidad(neta, params),
         "cuota_hipoteca": apalancamiento.get("cuota_hipoteca"),
         "cash_flow_mensual": apalancamiento.get("cash_flow_mensual"),
