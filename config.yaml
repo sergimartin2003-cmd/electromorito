@@ -22,17 +22,40 @@ idioma_region: es-es
 # --- Qué buscar -------------------------------------------------------
 # El scraper combina CADA categoría con CADA ubicación.
 # Ejemplo: "fundación discapacidad" + "Madrid" => "fundación discapacidad Madrid"
-# Con las listas de abajo salen varios cientos de búsquedas.
+# Con estas listas salen MUCHAS búsquedas (categorías x ciudades). Si es demasiado,
+# quita categorías o ciudades que no te interesen, o usa 'max_busquedas' más abajo.
+# Puedes borrar el # para activar una línea, o poner # delante para desactivarla.
 categorias:
-  - "fundación discapacidad"
-  - "fundación personas con discapacidad"
-  - "asociación discapacidad"
+  # --- Educación especial y formación ---
+  - "colegio de educación especial"
   - "centro de educación especial"
-  - "centro ocupacional discapacidad"
   - "escuela PFI programa de formación e inserción"
   - "centro IFE itinerario formativo específico"
-  - "centro de estudios formación"
+  - "centro de atención temprana discapacidad"
+  - "aula TEA colegio"
 
+  # --- Fundaciones y asociaciones ---
+  - "fundación discapacidad"
+  - "fundación personas con discapacidad"
+  - "fundación tutelar discapacidad"
+  - "asociación discapacidad"
+  - "asociación de familias personas con discapacidad"
+  - "asociación autismo TEA"
+  - "asociación síndrome de Down"
+  - "asociación parálisis cerebral"
+
+  # --- Empleo e inserción laboral (empresas que contratan discapacidad) ---
+  - "centro especial de empleo"
+  - "empresa de inserción laboral discapacidad"
+  - "empleo con apoyo discapacidad"
+
+  # --- Atención, ocio y centros ---
+  - "centro ocupacional discapacidad"
+  - "centro de día personas con discapacidad"
+  - "residencia personas con discapacidad"
+
+# Ciudades donde buscar. Están activas las 15 más grandes para que no tarde
+# demasiado. Para buscar también en las demás, quita el # del principio de su línea.
 ubicaciones:
   - Madrid
   - Barcelona
@@ -46,24 +69,25 @@ ubicaciones:
   - Córdoba
   - Valladolid
   - Vigo
-  - Gijón
   - "A Coruña"
   - Granada
   - "Palma de Mallorca"
-  - "Las Palmas"
-  - "Santa Cruz de Tenerife"
-  - Pamplona
-  - Santander
-  - "San Sebastián"
-  - Girona
-  - Tarragona
-  - Lleida
-  - Castellón
-  - Badajoz
-  - Salamanca
-  - León
-  - Burgos
-  - Toledo
+  # --- Quita el # para activar también estas ciudades ---
+  # - "Las Palmas"
+  # - "Santa Cruz de Tenerife"
+  # - Gijón
+  # - Pamplona
+  # - Santander
+  # - "San Sebastián"
+  # - Girona
+  # - Tarragona
+  # - Lleida
+  # - Castellón
+  # - Badajoz
+  # - Salamanca
+  # - León
+  # - Burgos
+  # - Toledo
 
 # Búsquedas sueltas adicionales (se añaden tal cual, sin combinar con ubicaciones)
 busquedas_extra: []
@@ -122,6 +146,11 @@ palabras_relevancia:
   - inclusiva
   - autismo
   - TEA
+  - síndrome de down
+  - parálisis cerebral
+  - discapacidad intelectual
+  - discapacidad física
+  - discapacidad sensorial
   - fundación
   - asociación
   - PFI
@@ -131,6 +160,16 @@ palabras_relevancia:
   - alumnos
   - alumnado
   - centro ocupacional
+  - centro especial de empleo
+  - inserción laboral
+  - empleo con apoyo
+  - trabajadores con discapacidad
+  - atención temprana
+  - centro de día
+  - centro de educación especial
+  - colegio de educación especial
+  - residencia
+  - plena inclusión
 
 # Si es true, NO guarda las webs cuya relevancia sea 0 (ninguna palabra encontrada)
 guardar_solo_relevantes: false

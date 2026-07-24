@@ -101,8 +101,12 @@ buscador…`). Y con `espera_adaptativa: true`, cuando detecta que te están lim
 **sube el ritmo de espera** para ser más prudente, y lo baja de nuevo cuando todo
 vuelve a ir bien. Así no tienes que estar vigilando la ejecución.
 
-Con las listas de ejemplo salen **240 búsquedas**. Empieza con pocas ciudades
-para probar y ve ampliando.
+Con las listas de ejemplo salen unas **300 búsquedas** (20 tipos de organización ×
+15 ciudades). Cubren fundaciones y asociaciones de discapacidad, colegios y centros
+de educación especial, PFI/IFE, centros especiales de empleo y empresas de inserción,
+atención temprana, centros de día, residencias, etc. Puedes añadir más ciudades (hay
+varias listas para activar quitando el `#`) o quitar tipos que no te interesen.
+Para una primera vez, prueba con `--prueba` o baja `max_busquedas`.
 
 ---
 
