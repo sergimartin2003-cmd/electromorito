@@ -42,8 +42,11 @@ Los resultados se guardan en **`resultados.csv`** y **`resultados.xlsx`**.
 
 - **Windows:** haz **doble clic en `run.bat`**. La primera vez crea el entorno,
   instala todo y ejecuta; las siguientes veces solo ejecuta.
-- **Mac / Linux:** en una terminal, `./run.sh` (puedes pasarle opciones, p. ej.
-  `./run.sh --prueba`).
+- **Mac:** haz **doble clic en `probar.command`** (prueba rápida) o en
+  **`ejecutar.command`** (ejecución completa). La primera vez, macOS puede pedir
+  permiso: haz **clic derecho → Abrir → Abrir**. (El archivo `run.bat` es solo de
+  Windows, en Mac se ignora.)
+- **Linux / Terminal:** `./run.sh` (acepta opciones, p. ej. `./run.sh --prueba`).
 
 ### Opción manual
 
@@ -262,7 +265,9 @@ python -m pytest
 ```
 electromorito/
 ├── run.py               # lanzador: python run.py
-├── run.sh / run.bat     # lanzadores fáciles (Mac/Linux y Windows)
+├── run.sh / run.bat     # lanzadores (Linux/Terminal y Windows)
+├── probar.command       # doble clic en Mac: prueba rápida
+├── ejecutar.command     # doble clic en Mac: ejecución completa
 ├── config.yaml          # QUÉ buscar y CÓMO (edítalo tú)
 ├── requirements.txt     # dependencias
 ├── requirements-dev.txt # dependencias de test (pytest)
