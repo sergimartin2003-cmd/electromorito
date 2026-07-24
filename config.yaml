@@ -199,6 +199,12 @@ archivo_salida: resultados
 gastos_pct: 0.25          # % del alquiler que se va en gastos (IBI, comunidad, seguro, mantenimiento, gestión, vacancia)
 costes_compra_pct: 0.11   # % sobre el precio por impuestos y gastos de compra (ITP/IVA, notaría, registro, agencia)
 
+# Hipoteca (análisis con apalancamiento). Si compras al contado, pon financiacion_pct: 0
+# y el panel omitirá las columnas de cuota/cash-flow/rentabilidad sobre fondos propios.
+financiacion_pct: 0.70    # % del precio que financias con hipoteca (0.70 = 70 %)
+interes_hipoteca: 0.03    # interés nominal anual (0.03 = 3 %)
+anios_hipoteca: 25        # plazo de la hipoteca en años
+
 # Alquiler de referencia en €/m²/mes por zona. Sirve para ESTIMAR el alquiler
 # cuando el anuncio de venta no lo trae. Pon valores reales de tu mercado.
 # La zona del anuncio se empareja de forma flexible (la clave más específica gana).

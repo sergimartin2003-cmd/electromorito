@@ -34,6 +34,10 @@ class ParametrosRentabilidad:
     umbral_excelente: float = 8.0
     umbral_buena: float = 6.0
     umbral_correcta: float = 4.0
+    # Hipoteca (para el análisis con apalancamiento). financiacion_pct = 0 => compra al contado.
+    financiacion_pct: float = 0.0
+    interes_hipoteca: float = 0.03
+    anios_hipoteca: int = 25
 
 
 # --- Lectura de números tolerante (formato español) ----------------------
@@ -69,6 +73,20 @@ def _a_numero(valor) -> Optional[float]:
         return float(num)
     except ValueError:
         return None
+
+
+def _a_booleano(valor) -> Optional[bool]:
+    """Interpreta 'sí/no/true/false/1/0' (o un bool) desde una columna del CSV."""
+    if isinstance(valor, bool):
+        return valor
+    if valor is None:
+        return None
+    t = str(valor).strip().lower()
+    if t in ("si", "sí", "true", "1", "yes", "con ascensor"):
+        return True
+    if t in ("no", "false", "0", "sin ascensor"):
+        return False
+    return None
 
 
 # --- Extracción desde el texto libre de un anuncio -----------------------
@@ -124,6 +142,56 @@ def extraer_habitaciones(texto: str) -> Optional[int]:
         if 0 <= n <= 20:
             return n
     return None
+
+
+def extraer_estado(texto: str) -> str:
+    """Deduce el estado del piso: 'a reformar', 'obra nueva', 'reformado', 'buen estado' o ''.
+
+    El orden importa: 'a reformar' tiene prioridad (baja el interés del piso y sube
+    el presupuesto), y 'reformado' se distingue de 'para reformar'.
+    """
+    if not texto:
+        return ""
+    t = _normalizar(texto)
+    if any(f in t for f in ("a reformar", "para reformar", "sin reformar",
+                            "necesita reforma", "para actualizar", "a actualizar",
+                            "para rehabilitar", "para entrar a reformar")):
+        return "a reformar"
+    if any(f in t for f in ("obra nueva", "a estrenar", "nueva construccion")):
+        return "obra nueva"
+    if any(f in t for f in ("reformado", "reformada", "reforma integral",
+                            "totalmente reformad", "recien reformad", "semireformad")):
+        return "reformado"
+    if any(f in t for f in ("buen estado", "buenas condiciones", "perfecto estado",
+                            "impecable", "seminuevo")):
+        return "buen estado"
+    return ""
+
+
+def tiene_ascensor(texto: str) -> Optional[bool]:
+    """True/False si el anuncio menciona (o niega) ascensor; None si no lo dice."""
+    if not texto:
+        return None
+    t = _normalizar(texto)
+    if any(f in t for f in ("sin ascensor", "no ascensor", "no dispone de ascensor")):
+        return False
+    if "ascensor" in t:
+        return True
+    return None
+
+
+def extraer_planta(texto: str) -> str:
+    """Devuelve la planta del piso ('ático', 'bajo', '3'…) o '' si no se indica."""
+    if not texto:
+        return ""
+    t = _normalizar(texto)
+    for palabra, etiqueta in (("sobreatico", "sobreático"), ("atico", "ático"),
+                              ("entresuelo", "entresuelo"), ("principal", "principal"),
+                              ("bajo", "bajo")):
+        if palabra in t:
+            return etiqueta
+    m = re.search(r"(\d{1,2})\s*[ao]?\s*planta", t) or re.search(r"planta\s*[:\-]?\s*(\d{1,2})", t)
+    return m.group(1) if m else ""
 
 
 # --- Estimación del alquiler por zona ------------------------------------
@@ -194,6 +262,46 @@ def rentabilidad_neta(precio: Optional[float], alquiler_mensual: Optional[float]
     return ingreso_neto / coste_total * 100
 
 
+def cuota_hipoteca(capital: float, interes_anual: float, anios: int) -> float:
+    """Cuota mensual de una hipoteca francesa (cuota constante). 0 si no hay capital."""
+    if not capital or capital <= 0 or not anios or anios <= 0:
+        return 0.0
+    n = int(anios * 12)
+    i = interes_anual / 12
+    if i <= 0:
+        return capital / n
+    return capital * i / (1 - (1 + i) ** (-n))
+
+
+def analizar_apalancamiento(precio: Optional[float], alquiler_mensual: Optional[float],
+                            params: ParametrosRentabilidad) -> Optional[dict]:
+    """Análisis con hipoteca: fondos propios, cuota, cash-flow y rentabilidad sobre fondos propios.
+
+    Devuelve None si no hay financiación configurada o faltan datos. La rentabilidad
+    sobre fondos propios (cash-on-cash) es el cash-flow anual dividido entre el dinero
+    que pones de tu bolsillo (entrada + gastos de compra).
+    """
+    if (not precio or precio <= 0 or not alquiler_mensual or alquiler_mensual <= 0
+            or not params.financiacion_pct or params.financiacion_pct <= 0):
+        return None
+    capital_prestamo = precio * params.financiacion_pct
+    entrada = precio - capital_prestamo
+    costes_compra = precio * params.costes_compra_pct
+    fondos_propios = entrada + costes_compra
+    cuota = cuota_hipoteca(capital_prestamo, params.interes_hipoteca, params.anios_hipoteca)
+    ingreso_neto_mensual = alquiler_mensual * (1 - params.gastos_pct)
+    cash_flow_mensual = ingreso_neto_mensual - cuota
+    cash_flow_anual = cash_flow_mensual * 12
+    roe = cash_flow_anual / fondos_propios * 100 if fondos_propios > 0 else None
+    return {
+        "fondos_propios": round(fondos_propios),
+        "cuota_hipoteca": round(cuota),
+        "cash_flow_mensual": round(cash_flow_mensual),
+        "cash_flow_anual": round(cash_flow_anual),
+        "rentabilidad_fondos_propios": round(roe, 2) if roe is not None else None,
+    }
+
+
 def clasificar_rentabilidad(pct: Optional[float],
                             params: ParametrosRentabilidad) -> str:
     """Etiqueta la rentabilidad neta: 'excelente', 'buena', 'correcta', 'baja' o 'sin datos'."""
@@ -238,6 +346,14 @@ def evaluar_piso(fila: dict, params: ParametrosRentabilidad) -> dict:
     neta = rentabilidad_neta(precio, alquiler, params)
     precio_m2 = round(precio / superficie) if (precio and superficie) else None
 
+    # Datos cualitativos del anuncio (del texto o de columnas propias)
+    estado = (fila.get("estado") or "").strip() or extraer_estado(texto)
+    planta = (fila.get("planta") or "").strip() or extraer_planta(texto)
+    ascensor = fila.get("ascensor")
+    ascensor = _a_booleano(ascensor) if ascensor not in (None, "") else tiene_ascensor(texto)
+
+    apalancamiento = analizar_apalancamiento(precio, alquiler, params) or {}
+
     return {
         "titulo": (fila.get("titulo") or fila.get("nombre") or "").strip(),
         "url": (fila.get("url") or fila.get("web") or "").strip(),
@@ -246,10 +362,17 @@ def evaluar_piso(fila: dict, params: ParametrosRentabilidad) -> dict:
         "superficie": superficie,
         "precio_m2": precio_m2,
         "habitaciones": habitaciones,
+        "estado": estado,
+        "planta": planta,
+        "ascensor": ascensor,
         "alquiler_mensual": int(alquiler) if alquiler else None,
         "alquiler_estimado": estimado,
         "rentabilidad_bruta": round(bruta, 2) if bruta is not None else None,
         "rentabilidad_neta": round(neta, 2) if neta is not None else None,
         "clasificacion": clasificar_rentabilidad(neta, params),
+        "cuota_hipoteca": apalancamiento.get("cuota_hipoteca"),
+        "cash_flow_mensual": apalancamiento.get("cash_flow_mensual"),
+        "rentabilidad_fondos_propios": apalancamiento.get("rentabilidad_fondos_propios"),
+        "fondos_propios": apalancamiento.get("fondos_propios"),
         "completo": neta is not None,
     }

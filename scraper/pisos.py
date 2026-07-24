@@ -23,8 +23,10 @@ from .rentabilidad import ParametrosRentabilidad, evaluar_piso
 
 CAMPOS_PISOS = [
     "titulo", "zona", "precio", "superficie", "precio_m2", "habitaciones",
-    "alquiler_mensual", "alquiler_estimado", "rentabilidad_bruta",
-    "rentabilidad_neta", "clasificacion", "url", "fecha",
+    "estado", "planta", "ascensor", "alquiler_mensual", "alquiler_estimado",
+    "rentabilidad_bruta", "rentabilidad_neta", "clasificacion",
+    "cuota_hipoteca", "cash_flow_mensual", "rentabilidad_fondos_propios",
+    "fondos_propios", "url", "fecha",
 ]
 
 
@@ -34,6 +36,9 @@ def parametros_desde_config(config) -> ParametrosRentabilidad:
         gastos_pct=getattr(config, "gastos_pct", 0.25),
         costes_compra_pct=getattr(config, "costes_compra_pct", 0.11),
         rentas_zona=dict(getattr(config, "rentas_zona", {}) or {}),
+        financiacion_pct=getattr(config, "financiacion_pct", 0.0),
+        interes_hipoteca=getattr(config, "interes_hipoteca", 0.03),
+        anios_hipoteca=getattr(config, "anios_hipoteca", 25),
     )
 
 
@@ -93,10 +98,37 @@ def escribir_csv(pisos: List[dict], ruta: str) -> None:
             writer.writerow(_a_fila_csv(p, fecha))
 
 
+# Columnas del panel: (clave, título). Las de hipoteca solo se muestran si hay financiación.
+_COLS_BASE = [
+    ("titulo", "Piso"), ("zona", "Zona"), ("precio", "Precio"), ("superficie", "m²"),
+    ("precio_m2", "€/m²"), ("habitaciones", "Hab."), ("estado", "Estado"),
+    ("alquiler_mensual", "Alquiler/mes"), ("rentabilidad_bruta", "Rent. bruta"),
+    ("rentabilidad_neta", "Rent. neta"), ("clasificacion", "Valoración"),
+]
+_COLS_HIPOTECA = [
+    ("cuota_hipoteca", "Cuota/mes"), ("cash_flow_mensual", "Cash-flow/mes"),
+    ("rentabilidad_fondos_propios", "Rent. s/ fondos"),
+]
+_COLS_FIN = [("url", "Anuncio")]
+_COLS_NUM = [
+    "precio", "superficie", "precio_m2", "habitaciones", "alquiler_mensual",
+    "rentabilidad_bruta", "rentabilidad_neta", "cuota_hipoteca", "cash_flow_mensual",
+    "rentabilidad_fondos_propios", "fondos_propios",
+]
+
+
 def generar_informe_pisos(pisos: List[dict], ruta_html: str) -> str:
     """Crea un panel HTML autónomo (filtrar/ordenar/abrir anuncio) y devuelve su ruta."""
+    con_hipoteca = any(p.get("cuota_hipoteca") is not None for p in pisos)
+    cols = _COLS_BASE + (_COLS_HIPOTECA if con_hipoteca else []) + _COLS_FIN
+
     datos = json.dumps(pisos, ensure_ascii=False).replace("</", "<\\/")
-    salida = _PLANTILLA.replace("/*__DATOS__*/null", datos)
+    salida = (
+        _PLANTILLA
+        .replace("/*__DATOS__*/null", datos)
+        .replace("/*__COLS__*/null", json.dumps(cols, ensure_ascii=False))
+        .replace("/*__NUMCOLS__*/null", json.dumps(_COLS_NUM))
+    )
     with open(ruta_html, "w", encoding="utf-8") as f:
         f.write(salida)
     return ruta_html
@@ -132,10 +164,17 @@ def ejecutar_pisos(config, ruta_entrada: str) -> Optional[int]:
         estimados = sum(1 for p in completos if p.get("alquiler_estimado"))
         if estimados:
             print(f"    (de ellos, {estimados} con el alquiler ESTIMADO por zona)")
+        con_hipoteca = params.financiacion_pct > 0
+        if con_hipoteca:
+            print(f"    (con hipoteca: {int(params.financiacion_pct*100)}% financiado, "
+                  f"{params.interes_hipoteca*100:.1f}% interés, {params.anios_hipoteca} años)")
         print("\n  Mejores por rentabilidad neta:")
         for p in completos[:10]:
-            titulo = (p.get("titulo") or p.get("zona") or p.get("url") or "—")[:44]
-            print(f"    {p['rentabilidad_neta']:>5.2f}%  {p.get('clasificacion',''):10} {titulo}")
+            titulo = (p.get("titulo") or p.get("zona") or p.get("url") or "—")[:40]
+            extra = ""
+            if con_hipoteca and p.get("cash_flow_mensual") is not None:
+                extra = f"  cash-flow {p['cash_flow_mensual']:>+5} €/mes"
+            print(f"    {p['rentabilidad_neta']:>5.2f}%  {p.get('clasificacion',''):10} {titulo:40}{extra}")
     print("\n  Ficheros generados:")
     print(f"    CSV:   {ruta_csv}")
     print(f"    Panel: {ruta_html}")
@@ -192,6 +231,10 @@ _PLANTILLA = r"""<!doctype html>
   .neta { font-weight:800; font-variant-numeric:tabular-nums; }
   .est { color:var(--muted); font-size:11px; }
   .ver { font-weight:600; }
+  .cf-pos { color:var(--exc); font-weight:700; font-variant-numeric:tabular-nums; }
+  .cf-neg { color:var(--baj); font-weight:700; font-variant-numeric:tabular-nums; }
+  .e-reformar { color:var(--cor); border-color:var(--cor); }
+  .e-ok { color:var(--muted); border-color:var(--bd); }
 </style>
 </head>
 <body>
@@ -225,14 +268,8 @@ _PLANTILLA = r"""<!doctype html>
 </div>
 <script>
 const DATOS = /*__DATOS__*/null;
-const COLS = [
-  ["titulo","Piso"],["zona","Zona"],["precio","Precio"],["superficie","m²"],
-  ["precio_m2","€/m²"],["habitaciones","Hab."],["alquiler_mensual","Alquiler/mes"],
-  ["rentabilidad_bruta","Rent. bruta"],["rentabilidad_neta","Rent. neta"],
-  ["clasificacion","Valoración"],["url","Anuncio"],
-];
-const NUM = new Set(["precio","superficie","precio_m2","habitaciones","alquiler_mensual",
-                     "rentabilidad_bruta","rentabilidad_neta"]);
+const COLS = /*__COLS__*/null;
+const NUM = new Set(/*__NUMCOLS__*/null);
 let orden = {col:"rentabilidad_neta", dir:-1};
 
 const $ = s => document.querySelector(s);
@@ -262,6 +299,18 @@ function celda(col, fila) {
   }
   if (col === "rentabilidad_bruta") return fmtPct(v);
   if (col === "rentabilidad_neta") return v==null ? "" : `<span class="neta">${fmtPct(v)}</span>`;
+  if (col === "rentabilidad_fondos_propios") return v==null ? "" : `<span class="neta">${fmtPct(v)}</span>`;
+  if (col === "cuota_hipoteca") return fmtEur(v);
+  if (col === "cash_flow_mensual") {
+    if (v==null||v==="") return "";
+    const cls = Number(v) < 0 ? "cf-neg" : "cf-pos";
+    return `<span class="${cls}">${fmtEur(v)}</span>`;
+  }
+  if (col === "estado") {
+    if (!v) return "";
+    const cls = (v === "a reformar") ? "e-reformar" : "e-ok";
+    return `<span class="pill ${cls}">${esc(v)}</span>`;
+  }
   if (col === "clasificacion") {
     const cls = "c-" + esc(v || "sin").split(" ")[0];
     return v ? `<span class="pill ${cls}">${esc(v)}</span>` : "";

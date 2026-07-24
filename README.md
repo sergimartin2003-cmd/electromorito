@@ -233,9 +233,13 @@ estas columnas —todas opcionales salvo las que hagan falta para el cálculo:
 | `superficie` | Metros cuadrados. |
 | `habitaciones` | Nº de habitaciones (informativo). |
 | `alquiler_mensual` | Alquiler esperado en €/mes. **Si lo dejas vacío**, se estima. |
+| `estado` | `a reformar` / `reformado` / `obra nueva`… (si no, se deduce del texto). |
+| `planta` | Planta (`ático`, `bajo`, `3`…). Informativo. |
+| `ascensor` | `sí` / `no`. Informativo. |
 
 Si no hay `precio`/`superficie`/`habitaciones` en su columna, se intentan **extraer
-del texto** (`descripcion` o `texto`). Si falta `alquiler_mensual`, se **estima**
+del texto** (`descripcion` o `texto`), igual que el `estado` (para reformar, reformado,
+obra nueva…), la `planta` y el `ascensor`. Si falta `alquiler_mensual`, se **estima**
 como `superficie × €/m²·mes` de la zona (tabla `rentas_zona` en `config.yaml`); esos
 pisos se marcan como *(est.)* en el panel.
 
@@ -245,17 +249,29 @@ pisos se marcan como *(est.)* en el panel.
 - **Rentabilidad neta** = descontando gastos del alquiler y costes de compra:
   `(alquiler·12·(1−gastos_pct)) ÷ (precio·(1+costes_compra_pct)) × 100`.
 
-Ambos porcentajes se configuran en `config.yaml` (`gastos_pct`, `costes_compra_pct`)
-junto con la tabla `rentas_zona`. Cada piso se clasifica en `excelente` / `buena` /
-`correcta` / `baja` según su rentabilidad neta.
+Cada piso se clasifica en `excelente` / `buena` / `correcta` / `baja` según su
+rentabilidad neta.
+
+**Con hipoteca (apalancamiento).** Si en `config.yaml` pones `financiacion_pct > 0`,
+además se calcula, para cada piso:
+
+- **Cuota mensual** de la hipoteca (sistema francés, con `interes_hipoteca` y `anios_hipoteca`).
+- **Cash-flow mensual** = alquiler neto de gastos − cuota (en verde si es positivo, rojo si no).
+- **Rentabilidad sobre fondos propios** (*cash-on-cash*) = cash-flow anual ÷ dinero que
+  pones de tu bolsillo (entrada + gastos de compra). Es la métrica clave al comprar con
+  hipoteca. Con `financiacion_pct: 0` (compra al contado) estas columnas no aparecen.
+
+Todos los supuestos se configuran en `config.yaml`: `gastos_pct`, `costes_compra_pct`,
+`rentas_zona`, `financiacion_pct`, `interes_hipoteca` y `anios_hipoteca`.
 
 ### Resultado
 
 Se generan `<archivo_salida>_pisos.csv` y `<archivo_salida>_pisos.html`. El panel
 HTML ordena los pisos de más a menos rentables y permite **filtrar por zona,
-rentabilidad neta mínima y precio máximo**, ordenar por cualquier columna y abrir
-cada anuncio en el portal original. Las rentabilidades son **estimaciones** a partir
-de los datos del anuncio y de los supuestos configurados: verifícalas antes de decidir.
+rentabilidad neta mínima y precio máximo**, ordenar por cualquier columna (incluidas
+cash-flow y rentabilidad sobre fondos propios) y abrir cada anuncio en el portal
+original. Las rentabilidades son **estimaciones** a partir de los datos del anuncio y
+de los supuestos configurados: verifícalas antes de decidir.
 
 ---
 

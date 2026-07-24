@@ -56,6 +56,10 @@ class Config:
     # Fracción sobre el precio por impuestos y gastos de compra (ITP/IVA,
     # notaría, registro, agencia). 0.11 = 11 %.
     costes_compra_pct: float = 0.11
+    # Hipoteca (análisis con apalancamiento). financiacion_pct = 0 => compra al contado.
+    financiacion_pct: float = 0.0
+    interes_hipoteca: float = 0.03
+    anios_hipoteca: int = 25
 
     # Lista de buscadores a usar (derivada de motor_busqueda; no se edita a mano)
     motores: List[str] = field(default_factory=list)
@@ -122,6 +126,11 @@ class Config:
         # Parámetros de rentabilidad de pisos
         self.gastos_pct = _decimal(self.gastos_pct, 0.25, minimo=0.0)
         self.costes_compra_pct = _decimal(self.costes_compra_pct, 0.11, minimo=0.0)
+        self.financiacion_pct = _decimal(self.financiacion_pct, 0.0, minimo=0.0)
+        if self.financiacion_pct > 0.95:
+            self.financiacion_pct = 0.95
+        self.interes_hipoteca = _decimal(self.interes_hipoteca, 0.03, minimo=0.0)
+        self.anios_hipoteca = _entero(self.anios_hipoteca, 25, minimo=1)
         if self.rentas_zona is None or not isinstance(self.rentas_zona, dict):
             self.rentas_zona = {}
         else:

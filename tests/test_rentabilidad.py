@@ -3,20 +3,31 @@
 from scraper.rentabilidad import (
     ParametrosRentabilidad,
     _a_numero,
+    analizar_apalancamiento,
     clasificar_rentabilidad,
+    cuota_hipoteca,
     estimar_alquiler,
     evaluar_piso,
+    extraer_estado,
     extraer_habitaciones,
+    extraer_planta,
     extraer_precio,
     extraer_superficie,
     rentabilidad_bruta,
     rentabilidad_neta,
+    tiene_ascensor,
 )
 
 PARAMS = ParametrosRentabilidad(
     gastos_pct=0.25,
     costes_compra_pct=0.11,
     rentas_zona={"Barcelona": 14, "Madrid centro": 18, "Madrid": 15},
+)
+
+PARAMS_HIP = ParametrosRentabilidad(
+    gastos_pct=0.25, costes_compra_pct=0.11,
+    financiacion_pct=0.70, interes_hipoteca=0.03, anios_hipoteca=25,
+    rentas_zona={"Madrid": 15},
 )
 
 
@@ -173,3 +184,66 @@ def test_evaluar_piso_incompleto():
     assert piso["completo"] is False
     assert piso["rentabilidad_neta"] is None
     assert piso["clasificacion"] == "sin datos"
+
+
+# --- Hipoteca / apalancamiento -------------------------------------------
+def test_cuota_hipoteca_frances():
+    assert round(cuota_hipoteca(150000, 0.03, 25), 2) == 711.32
+
+
+def test_cuota_hipoteca_sin_interes():
+    assert cuota_hipoteca(120000, 0, 20) == 500.0
+
+
+def test_cuota_hipoteca_sin_capital():
+    assert cuota_hipoteca(0, 0.03, 25) == 0.0
+
+
+def test_analizar_apalancamiento():
+    a = analizar_apalancamiento(180000, 900, PARAMS_HIP)
+    assert a["fondos_propios"] == 73800          # 30% entrada + 11% costes
+    assert a["cuota_hipoteca"] == 598            # sobre 126.000 € a 25 años
+    assert a["cash_flow_mensual"] == 77          # 675 neto − 598 cuota
+    assert a["rentabilidad_fondos_propios"] is not None
+
+
+def test_apalancamiento_sin_financiacion_es_none():
+    assert analizar_apalancamiento(180000, 900, PARAMS) is None
+
+
+def test_evaluar_piso_incluye_hipoteca():
+    piso = evaluar_piso(
+        {"titulo": "Piso", "zona": "Madrid", "precio": "250000", "superficie": "100",
+         "alquiler_mensual": "1400"},
+        PARAMS_HIP,
+    )
+    assert piso["cuota_hipoteca"] is not None
+    assert piso["cash_flow_mensual"] is not None
+    assert piso["rentabilidad_fondos_propios"] is not None
+
+
+# --- Estado, planta y ascensor -------------------------------------------
+def test_extraer_estado():
+    assert extraer_estado("Piso para reformar, mucha luz") == "a reformar"
+    assert extraer_estado("Vivienda totalmente reformada") == "reformado"
+    assert extraer_estado("Obra nueva a estrenar") == "obra nueva"
+    assert extraer_estado("Piso en buen estado") == "buen estado"
+    assert extraer_estado("Piso céntrico y luminoso") == ""
+
+
+def test_estado_para_reformar_tiene_prioridad():
+    # "para reformar" no debe clasificarse como "reformado"
+    assert extraer_estado("Piso para reformar a tu gusto") == "a reformar"
+
+
+def test_tiene_ascensor():
+    assert tiene_ascensor("Finca con ascensor") is True
+    assert tiene_ascensor("Sin ascensor, 2º piso") is False
+    assert tiene_ascensor("Piso luminoso") is None
+
+
+def test_extraer_planta():
+    assert extraer_planta("Bonito ático con terraza") == "ático"
+    assert extraer_planta("Piso en planta 3") == "3"
+    assert extraer_planta("Vivienda en bajo con patio") == "bajo"
+    assert extraer_planta("Piso luminoso") == ""
