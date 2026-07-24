@@ -134,6 +134,7 @@ Opciones disponibles:
 | `--informe` | No rastrea: solo regenera el panel HTML desde el CSV. |
 | `--contactos` | No rastrea: genera la lista depurada de contactos desde el CSV. |
 | `--desde-urls ARCHIVO` | No busca: extrae los contactos de una lista de URLs (una por línea). |
+| `--pisos ARCHIVO` | No rastrea: calcula la **rentabilidad** de los pisos de un CSV/JSON y genera un panel ordenado (ver más abajo). |
 | `--navegador RUTA` | Usa un Chrome/Chromium ya instalado (si no usas `playwright install`). |
 | `-c ARCHIVO` | Usa otro archivo de configuración. |
 
@@ -200,6 +201,64 @@ Para regenerarla desde un CSV ya existente: `python run.py --contactos`.
 
 ---
 
+## Rentabilidad de pisos (modo `--pisos`)
+
+Además del scraper de contactos, la herramienta incluye un **filtro de pisos por
+rentabilidad de alquiler**. La idea: partir de una lista de anuncios, calcular la
+rentabilidad de cada uno y quedarte con los mejores, con un panel que **enlaza de
+vuelta a cada anuncio** (así "mandas a la gente a la web" del portal original).
+
+> Este modo **no rastrea** ningún portal: trabaja sobre datos que **tú aportas**
+> (un export, una lista de anuncios, una API con la que tengas permiso…). Los
+> grandes portales inmobiliarios (idealista, Habitaclia, Fotocasa…) **prohíben el
+> scraping** en sus condiciones y lo bloquean activamente; consíguelo por una vía
+> con la que tengas derecho. Ver [Uso responsable y legal](#uso-responsable-y-legal).
+
+### Cómo se usa
+
+```bash
+# Prueba con el fichero de ejemplo incluido:
+python run.py --pisos pisos_ejemplo.csv
+```
+
+La entrada es un **CSV** (una fila por piso) o un **JSON** (lista de objetos) con
+estas columnas —todas opcionales salvo las que hagan falta para el cálculo:
+
+| Columna | Para qué |
+|---|---|
+| `titulo` | Nombre/descripción corta del anuncio. |
+| `url` | Enlace al anuncio (es lo que abre el botón «Ver anuncio»). |
+| `zona` | Ciudad/barrio; sirve para estimar el alquiler si no lo das. |
+| `precio` | Precio de venta en €. |
+| `superficie` | Metros cuadrados. |
+| `habitaciones` | Nº de habitaciones (informativo). |
+| `alquiler_mensual` | Alquiler esperado en €/mes. **Si lo dejas vacío**, se estima. |
+
+Si no hay `precio`/`superficie`/`habitaciones` en su columna, se intentan **extraer
+del texto** (`descripcion` o `texto`). Si falta `alquiler_mensual`, se **estima**
+como `superficie × €/m²·mes` de la zona (tabla `rentas_zona` en `config.yaml`); esos
+pisos se marcan como *(est.)* en el panel.
+
+### El cálculo
+
+- **Rentabilidad bruta** = `alquiler × 12 ÷ precio × 100`.
+- **Rentabilidad neta** = descontando gastos del alquiler y costes de compra:
+  `(alquiler·12·(1−gastos_pct)) ÷ (precio·(1+costes_compra_pct)) × 100`.
+
+Ambos porcentajes se configuran en `config.yaml` (`gastos_pct`, `costes_compra_pct`)
+junto con la tabla `rentas_zona`. Cada piso se clasifica en `excelente` / `buena` /
+`correcta` / `baja` según su rentabilidad neta.
+
+### Resultado
+
+Se generan `<archivo_salida>_pisos.csv` y `<archivo_salida>_pisos.html`. El panel
+HTML ordena los pisos de más a menos rentables y permite **filtrar por zona,
+rentabilidad neta mínima y precio máximo**, ordenar por cualquier columna y abrir
+cada anuncio en el portal original. Las rentabilidades son **estimaciones** a partir
+de los datos del anuncio y de los supuestos configurados: verifícalas antes de decidir.
+
+---
+
 ## Consejos y resolución de problemas
 
 - **"playwright: command not found" / no encuentra el navegador** → ejecuta
@@ -248,6 +307,13 @@ cumplir **por tu cuenta**:
 - **Calidad, no cantidad.** Es mejor una lista pequeña y bien segmentada, contactada
   con respeto, que miles de correos enviados a ciegas.
 
+- **Portales inmobiliarios (modo `--pisos`).** El modo de rentabilidad **no rastrea**
+  ningún portal: trabaja sobre datos que tú aportas. Ten en cuenta que idealista,
+  Habitaclia, Fotocasa y similares **prohíben el scraping** en sus condiciones de uso,
+  emplean protecciones anti-bot y suelen alegar **derecho *sui generis* sobre su base
+  de datos** de anuncios. Consigue los datos por una vía con la que tengas derecho
+  (su API oficial, *feeds* de inmobiliarias, o acuerdos), no extrayéndolos a lo bruto.
+
 Esta información es orientativa y **no es asesoramiento jurídico**. Si vas a hacer
 campañas de contacto a gran escala, consulta con un profesional.
 
@@ -285,7 +351,10 @@ electromorito/
 │   ├── storage.py       # guarda CSV + Excel, deduplica, migra y reanuda
 │   ├── report.py        # genera el panel HTML navegable
 │   ├── contactos.py     # lista depurada (una fila por organización) para envío
+│   ├── rentabilidad.py  # motor de rentabilidad de pisos (parsers + cálculo)
+│   ├── pisos.py         # modo --pisos: filtra/ordena pisos y genera su panel HTML
 │   ├── runner.py        # orquesta todo el proceso
 │   └── util.py          # utilidades (dominios, pausas, DNS, espera adaptativa)
+├── pisos_ejemplo.csv    # anuncios de ejemplo para  python run.py --pisos
 └── tests/               # tests automáticos (pytest)
 ```

@@ -60,6 +60,11 @@ def main() -> None:
         help="No busca: extrae los contactos de las URLs de un archivo (una por línea).",
     )
     parser.add_argument(
+        "--pisos", default=None, metavar="ARCHIVO",
+        help="No rastrea: calcula la rentabilidad de los pisos de un CSV/JSON y "
+             "genera un panel ordenado que enlaza a cada anuncio.",
+    )
+    parser.add_argument(
         "--navegador", default=None, metavar="RUTA",
         help="Ruta a un Chrome/Chromium ya instalado (si no usas 'playwright install').",
     )
@@ -77,6 +82,11 @@ def main() -> None:
         config.guardar_solo_relevantes = True
     if args.navegador:
         config.ruta_navegador = args.navegador
+
+    if args.pisos:
+        from .pisos import ejecutar_pisos
+        ejecutar_pisos(config, args.pisos)
+        return
 
     if args.informe:
         from .report import generar_informe

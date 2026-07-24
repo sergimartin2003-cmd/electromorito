@@ -46,6 +46,17 @@ class Config:
     # Si es True, comprueba por DNS que el dominio del correo existe (más lento)
     verificar_dominio: bool = False
 
+    # --- Rentabilidad de pisos (modo --pisos) -------------------------
+    # €/m²/mes de referencia por zona, para estimar el alquiler cuando el anuncio
+    # no lo trae. Ej.: {"Barcelona": 14, "Madrid": 15}
+    rentas_zona: dict = field(default_factory=dict)
+    # Fracción del alquiler bruto que se va en gastos (IBI, comunidad, seguro,
+    # mantenimiento, gestión, vacancia). 0.25 = 25 %.
+    gastos_pct: float = 0.25
+    # Fracción sobre el precio por impuestos y gastos de compra (ITP/IVA,
+    # notaría, registro, agencia). 0.11 = 11 %.
+    costes_compra_pct: float = 0.11
+
     # Lista de buscadores a usar (derivada de motor_busqueda; no se edita a mano)
     motores: List[str] = field(default_factory=list)
 
@@ -107,6 +118,19 @@ class Config:
         self.respetar_robots = _booleano(self.respetar_robots, True)
         self.guardar_solo_relevantes = _booleano(self.guardar_solo_relevantes, False)
         self.verificar_dominio = _booleano(self.verificar_dominio, False)
+
+        # Parámetros de rentabilidad de pisos
+        self.gastos_pct = _decimal(self.gastos_pct, 0.25, minimo=0.0)
+        self.costes_compra_pct = _decimal(self.costes_compra_pct, 0.11, minimo=0.0)
+        if self.rentas_zona is None or not isinstance(self.rentas_zona, dict):
+            self.rentas_zona = {}
+        else:
+            rentas: dict = {}
+            for zona, precio in self.rentas_zona.items():
+                valor = _decimal(precio, 0.0, minimo=0.0)
+                if valor > 0 and str(zona).strip():
+                    rentas[str(zona).strip()] = valor
+            self.rentas_zona = rentas
 
         # Motor(es) de búsqueda: admite un nombre, "auto" o una lista de nombres.
         from .search import MOTORES_AUTO, MOTORES_VALIDOS  # import diferido (evita ciclo)

@@ -10,6 +10,9 @@ __pycache__/
 resultados.csv
 resultados.xlsx
 resultados.html
+*_contactos.csv
+*_pisos.csv
+*_pisos.html
 *_dominios_visitados.txt
 salida/
 *.log
