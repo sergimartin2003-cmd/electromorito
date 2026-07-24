@@ -205,6 +205,11 @@ financiacion_pct: 0.70    # % del precio que financias con hipoteca (0.70 = 70 %
 interes_hipoteca: 0.03    # interés nominal anual (0.03 = 3 %)
 anios_hipoteca: 25        # plazo de la hipoteca en años
 
+# Detección de "chollos": un piso se marca 🔥 si su €/m² está este % (o más) por
+# debajo de la MEDIANA de €/m² de su zona (calculada con los pisos del propio fichero;
+# hacen falta al menos 2 pisos en la zona para comparar).
+umbral_chollo: 10         # % por debajo de la mediana de la zona
+
 # Alquiler de referencia en €/m²/mes por zona. Sirve para ESTIMAR el alquiler
 # cuando el anuncio de venta no lo trae. Pon valores reales de tu mercado.
 # La zona del anuncio se empareja de forma flexible (la clave más específica gana).

@@ -6,6 +6,7 @@ from scraper.rentabilidad import (
     analizar_apalancamiento,
     clasificar_rentabilidad,
     cuota_hipoteca,
+    es_exterior,
     estimar_alquiler,
     evaluar_piso,
     extraer_estado,
@@ -13,9 +14,13 @@ from scraper.rentabilidad import (
     extraer_planta,
     extraer_precio,
     extraer_superficie,
+    price_to_rent,
+    puntuacion,
     rentabilidad_bruta,
     rentabilidad_neta,
     tiene_ascensor,
+    tiene_garaje,
+    tiene_terraza,
 )
 
 PARAMS = ParametrosRentabilidad(
@@ -247,3 +252,35 @@ def test_extraer_planta():
     assert extraer_planta("Piso en planta 3") == "3"
     assert extraer_planta("Vivienda en bajo con patio") == "bajo"
     assert extraer_planta("Piso luminoso") == ""
+
+
+def test_extras_terraza_garaje_exterior():
+    assert tiene_terraza("Piso con terraza") is True
+    assert tiene_terraza("Piso interior") is None
+    assert tiene_garaje("Incluye plaza de garaje") is True
+    assert tiene_garaje("Sin garaje") is False
+    assert es_exterior("Vivienda exterior") is True
+    assert es_exterior("Piso interior") is False
+    assert es_exterior("Piso céntrico") is None
+
+
+# --- PER y puntuación ----------------------------------------------------
+def test_price_to_rent():
+    assert price_to_rent(180000, 900) == 16.7   # 180000 / (900*12)
+    assert price_to_rent(0, 900) is None
+
+
+def test_puntuacion_maxima():
+    piso = {"rentabilidad_neta": 8.0, "descuento_zona": 15.0,
+            "estado": "reformado", "alquiler_estimado": False}
+    assert puntuacion(piso, PARAMS) == 100      # 60 (rent) + 25 (descuento) + 15 (calidad)
+
+
+def test_puntuacion_penaliza_reformar_y_estimado():
+    piso = {"rentabilidad_neta": 4.0, "descuento_zona": None,
+            "estado": "a reformar", "alquiler_estimado": True}
+    assert puntuacion(piso, PARAMS) == 30       # 30 (rent) + 0 + 0 (calidad 15-10-5)
+
+
+def test_puntuacion_none_sin_rentabilidad():
+    assert puntuacion({"rentabilidad_neta": None}, PARAMS) is None

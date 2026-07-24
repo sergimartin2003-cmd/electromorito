@@ -17,16 +17,23 @@ import csv
 import datetime as _dt
 import json
 import os
+from statistics import median
 from typing import Dict, List, Optional
 
-from .rentabilidad import ParametrosRentabilidad, evaluar_piso
+from .rentabilidad import (
+    ParametrosRentabilidad,
+    _normalizar,
+    evaluar_piso,
+    puntuacion,
+)
 
 CAMPOS_PISOS = [
-    "titulo", "zona", "precio", "superficie", "precio_m2", "habitaciones",
-    "estado", "planta", "ascensor", "alquiler_mensual", "alquiler_estimado",
-    "rentabilidad_bruta", "rentabilidad_neta", "clasificacion",
+    "titulo", "zona", "precio", "superficie", "precio_m2", "mediana_zona_m2",
+    "descuento_zona", "es_chollo", "habitaciones", "estado", "planta", "ascensor",
+    "terraza", "garaje", "exterior", "alquiler_mensual", "alquiler_estimado",
+    "rentabilidad_bruta", "rentabilidad_neta", "per", "clasificacion",
     "cuota_hipoteca", "cash_flow_mensual", "rentabilidad_fondos_propios",
-    "fondos_propios", "url", "fecha",
+    "fondos_propios", "puntuacion", "url", "fecha",
 ]
 
 
@@ -39,6 +46,7 @@ def parametros_desde_config(config) -> ParametrosRentabilidad:
         financiacion_pct=getattr(config, "financiacion_pct", 0.0),
         interes_hipoteca=getattr(config, "interes_hipoteca", 0.03),
         anios_hipoteca=getattr(config, "anios_hipoteca", 25),
+        umbral_chollo=getattr(config, "umbral_chollo", 10.0),
     )
 
 
@@ -59,18 +67,48 @@ def cargar_pisos(ruta: str) -> List[dict]:
     return filas
 
 
+def _anotar_zona(pisos: List[dict], params: ParametrosRentabilidad) -> None:
+    """Calcula la mediana de €/m² por zona y marca descuento, chollo y puntuación.
+
+    La mediana solo se usa si la zona tiene al menos 2 pisos con precio/m² (para que
+    la comparación tenga sentido). Modifica los pisos en el sitio.
+    """
+    grupos: Dict[str, List[float]] = {}
+    for p in pisos:
+        z = _normalizar(p.get("zona", ""))
+        if z and p.get("precio_m2"):
+            grupos.setdefault(z, []).append(p["precio_m2"])
+    medianas = {z: median(v) for z, v in grupos.items() if len(v) >= 2}
+
+    for p in pisos:
+        z = _normalizar(p.get("zona", ""))
+        med = medianas.get(z)
+        if med and p.get("precio_m2"):
+            desc = (med - p["precio_m2"]) / med * 100
+            p["mediana_zona_m2"] = round(med)
+            p["descuento_zona"] = round(desc, 1)
+            p["es_chollo"] = desc >= params.umbral_chollo
+        p["puntuacion"] = puntuacion(p, params)
+
+
 def procesar_pisos(filas: List[dict], params: ParametrosRentabilidad) -> List[dict]:
-    """Evalúa cada anuncio y devuelve la lista ordenada por rentabilidad neta (desc.).
+    """Evalúa cada anuncio y devuelve la lista ordenada por puntuación (desc.).
 
     Los pisos sin datos suficientes para calcular la rentabilidad quedan al final.
     """
     evaluados = [evaluar_piso(fila, params) for fila in filas]
+    _anotar_zona(evaluados, params)
 
     def _clave(p: dict):
+        # Los que tienen rentabilidad van primero; dentro, por puntuación y luego
+        # por rentabilidad neta (desempate). Los incompletos, al final.
+        punt = p.get("puntuacion")
         neta = p.get("rentabilidad_neta")
-        # Los que tienen rentabilidad van primero (True<False al invertir), y dentro,
-        # de mayor a menor. Los incompletos, al final.
-        return (p.get("completo", False), neta if neta is not None else float("-inf"))
+        return (
+            p.get("completo", False),
+            punt if punt is not None else float("-inf"),
+            neta if neta is not None else float("-inf"),
+        )
 
     evaluados.sort(key=_clave, reverse=True)
     return evaluados
@@ -100,10 +138,12 @@ def escribir_csv(pisos: List[dict], ruta: str) -> None:
 
 # Columnas del panel: (clave, título). Las de hipoteca solo se muestran si hay financiación.
 _COLS_BASE = [
-    ("titulo", "Piso"), ("zona", "Zona"), ("precio", "Precio"), ("superficie", "m²"),
-    ("precio_m2", "€/m²"), ("habitaciones", "Hab."), ("estado", "Estado"),
+    ("puntuacion", "Puntuación"), ("titulo", "Piso"), ("zona", "Zona"),
+    ("precio", "Precio"), ("precio_m2", "€/m²"), ("descuento_zona", "vs. zona"),
+    ("superficie", "m²"), ("habitaciones", "Hab."), ("estado", "Estado"),
     ("alquiler_mensual", "Alquiler/mes"), ("rentabilidad_bruta", "Rent. bruta"),
-    ("rentabilidad_neta", "Rent. neta"), ("clasificacion", "Valoración"),
+    ("rentabilidad_neta", "Rent. neta"), ("per", "PER (años)"),
+    ("clasificacion", "Valoración"),
 ]
 _COLS_HIPOTECA = [
     ("cuota_hipoteca", "Cuota/mes"), ("cash_flow_mensual", "Cash-flow/mes"),
@@ -111,8 +151,9 @@ _COLS_HIPOTECA = [
 ]
 _COLS_FIN = [("url", "Anuncio")]
 _COLS_NUM = [
-    "precio", "superficie", "precio_m2", "habitaciones", "alquiler_mensual",
-    "rentabilidad_bruta", "rentabilidad_neta", "cuota_hipoteca", "cash_flow_mensual",
+    "puntuacion", "precio", "superficie", "precio_m2", "mediana_zona_m2",
+    "descuento_zona", "habitaciones", "alquiler_mensual", "rentabilidad_bruta",
+    "rentabilidad_neta", "per", "cuota_hipoteca", "cash_flow_mensual",
     "rentabilidad_fondos_propios", "fondos_propios",
 ]
 
@@ -155,11 +196,14 @@ def ejecutar_pisos(config, ruta_entrada: str) -> Optional[int]:
     generar_informe_pisos(pisos, ruta_html)
 
     completos = [p for p in pisos if p.get("completo")]
+    chollos = [p for p in completos if p.get("es_chollo")]
     print("=" * 64)
     print("  RENTABILIDAD DE PISOS")
     print("=" * 64)
     print(f"  Anuncios analizados:     {len(pisos)}")
     print(f"  Con rentabilidad calc.:  {len(completos)}")
+    if chollos:
+        print(f"  Chollos (bajo mediana):  {len(chollos)} 🔥")
     if completos:
         estimados = sum(1 for p in completos if p.get("alquiler_estimado"))
         if estimados:
@@ -168,13 +212,15 @@ def ejecutar_pisos(config, ruta_entrada: str) -> Optional[int]:
         if con_hipoteca:
             print(f"    (con hipoteca: {int(params.financiacion_pct*100)}% financiado, "
                   f"{params.interes_hipoteca*100:.1f}% interés, {params.anios_hipoteca} años)")
-        print("\n  Mejores por rentabilidad neta:")
+        print("\n  Mejores por puntuación (rentabilidad + descuento de zona + calidad):")
         for p in completos[:10]:
-            titulo = (p.get("titulo") or p.get("zona") or p.get("url") or "—")[:40]
+            titulo = (p.get("titulo") or p.get("zona") or p.get("url") or "—")[:34]
+            marca = " 🔥" if p.get("es_chollo") else ""
             extra = ""
             if con_hipoteca and p.get("cash_flow_mensual") is not None:
                 extra = f"  cash-flow {p['cash_flow_mensual']:>+5} €/mes"
-            print(f"    {p['rentabilidad_neta']:>5.2f}%  {p.get('clasificacion',''):10} {titulo:40}{extra}")
+            print(f"    [{p.get('puntuacion', 0):>3}]  {p['rentabilidad_neta']:>5.2f}% neta  "
+                  f"{titulo:34}{marca}{extra}")
     print("\n  Ficheros generados:")
     print(f"    CSV:   {ruta_csv}")
     print(f"    Panel: {ruta_html}")
@@ -209,6 +255,8 @@ _PLANTILLA = r"""<!doctype html>
          border:1px solid var(--bd); border-radius:8px; padding:8px 10px; }
   input[type=search] { min-width:220px; flex:1; }
   input[type=number] { width:120px; }
+  button { cursor:pointer; }
+  button:hover { border-color:var(--acc); color:var(--acc); }
   .cuenta { color:var(--muted); font-size:13px; margin-left:auto; }
   .envoltura { overflow-x:auto; padding:0 22px 40px; }
   table { border-collapse:collapse; width:100%; margin-top:12px; background:var(--card);
@@ -235,6 +283,17 @@ _PLANTILLA = r"""<!doctype html>
   .cf-neg { color:var(--baj); font-weight:700; font-variant-numeric:tabular-nums; }
   .e-reformar { color:var(--cor); border-color:var(--cor); }
   .e-ok { color:var(--muted); border-color:var(--bd); }
+  .punt { display:inline-block; min-width:34px; text-align:center; padding:3px 8px;
+          border-radius:8px; font-weight:800; font-variant-numeric:tabular-nums; color:#fff; }
+  .p-alta { background:var(--exc); }
+  .p-media { background:var(--cor); }
+  .p-baja { background:var(--gra, #94a3b8); }
+  .chollo { color:var(--baj); border-color:var(--baj); font-weight:800; }
+  .tiles { display:flex; flex-wrap:wrap; gap:12px; padding:14px 22px 0; }
+  .tile { background:var(--card); border:1px solid var(--bd); border-radius:10px;
+          padding:10px 14px; min-width:120px; }
+  .tile .k { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.03em; }
+  .tile .val { font-size:20px; font-weight:800; font-variant-numeric:tabular-nums; margin-top:2px; }
 </style>
 </head>
 <body>
@@ -243,8 +302,10 @@ _PLANTILLA = r"""<!doctype html>
   <div class="sub" id="resumen"></div>
   <div class="aviso">La rentabilidad es una <b>estimación</b> a partir de los datos del anuncio y de los
   supuestos de gastos/compra configurados. El alquiler marcado <span class="est">(est.)</span> se ha
-  estimado por zona. Verifica siempre los números antes de decidir.</div>
+  estimado por zona; 🔥 marca los pisos por debajo de la mediana de €/m² de su zona.
+  Verifica siempre los números antes de decidir.</div>
 </header>
+<div class="tiles" id="tiles"></div>
 <div class="controles">
   <input type="search" id="buscar" placeholder="Buscar título, zona…">
   <select id="fZona"><option value="">Todas las zonas</option></select>
@@ -258,6 +319,8 @@ _PLANTILLA = r"""<!doctype html>
   </select>
   <input type="number" id="fPrecio" placeholder="Precio máx. €" min="0" step="10000">
   <label class="est"><input type="checkbox" id="fCompleto" style="width:auto" checked> Solo con rentabilidad</label>
+  <label class="est"><input type="checkbox" id="fChollo" style="width:auto"> Solo chollos 🔥</label>
+  <button class="sec" id="btnCsv">Descargar CSV filtrado</button>
   <span class="cuenta" id="cuenta"></span>
 </div>
 <div class="envoltura">
@@ -270,7 +333,7 @@ _PLANTILLA = r"""<!doctype html>
 const DATOS = /*__DATOS__*/null;
 const COLS = /*__COLS__*/null;
 const NUM = new Set(/*__NUMCOLS__*/null);
-let orden = {col:"rentabilidad_neta", dir:-1};
+let orden = {col:"puntuacion", dir:-1};
 
 const $ = s => document.querySelector(s);
 const esc = s => (s==null?"":String(s)).replace(/[&<>"]/g, c => (
@@ -278,6 +341,8 @@ const esc = s => (s==null?"":String(s)).replace(/[&<>"]/g, c => (
 const fmtEur = n => (n==null||n==="") ? "" : Number(n).toLocaleString("es-ES") + " €";
 const fmtPct = n => (n==null||n==="") ? "" : Number(n).toLocaleString("es-ES",
   {minimumFractionDigits:2, maximumFractionDigits:2}) + " %";
+const fmtNum = n => (n==null||n==="") ? "" : Number(n).toLocaleString("es-ES",
+  {maximumFractionDigits:1});
 
 function opciones(sel, valores) {
   const el = $(sel);
@@ -290,6 +355,19 @@ function celda(col, fila) {
   const v = fila[col];
   if (col === "url") return v ? `<a class="ver" href="${esc(v)}" target="_blank" rel="noopener">Ver anuncio →</a>` : "";
   if (col === "titulo") return `<span>${esc(v || "(sin título)")}</span>`;
+  if (col === "puntuacion") {
+    if (v==null||v==="") return "";
+    const b = v >= 70 ? "p-alta" : (v >= 45 ? "p-media" : "p-baja");
+    return `<span class="punt ${b}">${esc(v)}</span>`;
+  }
+  if (col === "descuento_zona") {
+    if (v==null||v==="") return "";
+    const chollo = fila.es_chollo ? ' <span class="pill chollo">🔥 chollo</span>' : "";
+    if (Number(v) > 0) return `<span class="cf-pos">▼ ${fmtNum(v)} %</span>${chollo}`;
+    if (Number(v) < 0) return `<span class="cf-neg">▲ ${fmtNum(-v)} %</span>`;
+    return "0 %";
+  }
+  if (col === "per") return (v==null||v==="") ? "" : `${fmtNum(v)} años`;
   if (col === "precio" || col === "precio_m2") return fmtEur(v);
   if (col === "superficie") return (v==null||v==="") ? "" : `${esc(v)} m²`;
   if (col === "alquiler_mensual") {
@@ -324,8 +402,10 @@ function filtradas() {
   const minRent = parseFloat($("#fRent").value) || 0;
   const maxPrecio = parseFloat($("#fPrecio").value);
   const soloCompleto = $("#fCompleto").checked;
+  const soloChollo = $("#fChollo").checked;
   let f = DATOS.filter(r => {
     if (soloCompleto && !r.completo) return false;
+    if (soloChollo && !r.es_chollo) return false;
     if (zona && r.zona !== zona) return false;
     const neta = (r.rentabilidad_neta==null) ? -Infinity : Number(r.rentabilidad_neta);
     if (neta < minRent) return false;
@@ -349,6 +429,30 @@ function filtradas() {
   return f;
 }
 
+function media(filas, campo) {
+  const v = filas.map(r => r[campo]).filter(x => x!=null && x!=="").map(Number);
+  return v.length ? v.reduce((a,b)=>a+b,0)/v.length : null;
+}
+
+function tiles(filas) {
+  const conRent = filas.filter(r => r.completo);
+  const mNeta = media(conRent, "rentabilidad_neta");
+  const mPer = media(conRent, "per");
+  const mCash = media(conRent, "cash_flow_mensual");
+  const nChollos = filas.filter(r => r.es_chollo).length;
+  const t = [
+    ["Pisos", filas.length],
+    ["Con rentabilidad", conRent.length],
+    ["Rent. neta media", mNeta==null ? "—" : fmtPct(mNeta)],
+    ["PER medio", mPer==null ? "—" : fmtNum(mPer)+" años"],
+  ];
+  if (conRent.some(r => r.cash_flow_mensual!=null))
+    t.push(["Cash-flow medio", mCash==null ? "—" : fmtEur(Math.round(mCash))+"/mes"]);
+  t.push(["Chollos", nChollos + (nChollos? " 🔥":"")]);
+  $("#tiles").innerHTML = t.map(([k,v]) =>
+    `<div class="tile"><div class="k">${esc(k)}</div><div class="val">${v}</div></div>`).join("");
+}
+
 function pintar() {
   const filas = filtradas();
   $("#cuerpo").innerHTML = filas.map(r =>
@@ -358,6 +462,29 @@ function pintar() {
     }).join("") + "</tr>"
   ).join("");
   $("#cuenta").textContent = `${filas.length} piso(s)`;
+  tiles(filas);
+}
+
+function descargarCsv() {
+  const filas = filtradas();
+  const cabecera = COLS.map(([,t]) => t);
+  const lineas = [cabecera.join(",")];
+  for (const r of filas) {
+    const celdas = COLS.map(([c]) => {
+      let v = r[c];
+      if (v==null) v = "";
+      else if (typeof v === "boolean") v = v ? "sí" : "no";
+      v = String(v);
+      return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v;
+    });
+    lineas.push(celdas.join(","));
+  }
+  const blob = new Blob(["﻿"+lineas.join("\n")], {type:"text/csv;charset=utf-8"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "pisos_filtrados.csv";
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 function init() {
@@ -370,9 +497,10 @@ function init() {
     orden = {col:c, dir: orden.col===c ? -orden.dir : (NUM.has(c)?-1:1)};
     pintar();
   });
-  ["#buscar","#fZona","#fRent","#fPrecio","#fCompleto"].forEach(s => {
+  ["#buscar","#fZona","#fRent","#fPrecio","#fCompleto","#fChollo"].forEach(s => {
     $(s).addEventListener("input", pintar); $(s).addEventListener("change", pintar);
   });
+  $("#btnCsv").addEventListener("click", descargarCsv);
   pintar();
 }
 init();

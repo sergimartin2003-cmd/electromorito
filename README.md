@@ -250,7 +250,19 @@ pisos se marcan como *(est.)* en el panel.
   `(alquiler·12·(1−gastos_pct)) ÷ (precio·(1+costes_compra_pct)) × 100`.
 
 Cada piso se clasifica en `excelente` / `buena` / `correcta` / `baja` según su
-rentabilidad neta.
+rentabilidad neta, y se calcula el **PER** (*price-to-rent*): años en recuperar la
+compra con el alquiler.
+
+**Detección de chollos (comparativa de zona).** Con los pisos del propio fichero se
+calcula la **mediana de €/m² de cada zona** (hace falta al menos 2 pisos en la zona) y
+se marca 🔥 el que esté un `umbral_chollo` % (10 por defecto) o más **por debajo** de
+esa mediana: un indicio de piso infravalorado.
+
+**Puntuación (0–100).** Para ordenar oportunidades de un vistazo, cada piso recibe una
+puntuación que combina, de forma transparente: rentabilidad neta (hasta 60 pts),
+descuento respecto a la mediana de su zona (hasta 25 pts) y calidad (hasta 15 pts,
+restando por estar *a reformar* o tener el alquiler estimado). El panel se ordena por
+ella por defecto.
 
 **Con hipoteca (apalancamiento).** Si en `config.yaml` pones `financiacion_pct > 0`,
 además se calcula, para cada piso:
@@ -267,11 +279,13 @@ Todos los supuestos se configuran en `config.yaml`: `gastos_pct`, `costes_compra
 ### Resultado
 
 Se generan `<archivo_salida>_pisos.csv` y `<archivo_salida>_pisos.html`. El panel
-HTML ordena los pisos de más a menos rentables y permite **filtrar por zona,
-rentabilidad neta mínima y precio máximo**, ordenar por cualquier columna (incluidas
-cash-flow y rentabilidad sobre fondos propios) y abrir cada anuncio en el portal
-original. Las rentabilidades son **estimaciones** a partir de los datos del anuncio y
-de los supuestos configurados: verifícalas antes de decidir.
+HTML ordena los pisos por puntuación y permite **filtrar por zona, rentabilidad neta
+mínima, precio máximo y solo chollos**, ordenar por cualquier columna (puntuación,
+rentabilidad, PER, cash-flow, rentabilidad sobre fondos propios…) y abrir cada anuncio
+en el portal original. Arriba muestra unos **indicadores** (nº de pisos, rentabilidad
+neta media, PER medio, cash-flow medio, nº de chollos) que se **recalculan al filtrar**,
+y un botón para **descargar el CSV ya filtrado**. Las rentabilidades son **estimaciones**
+a partir de los datos del anuncio y de los supuestos configurados: verifícalas antes de decidir.
 
 ---
 

@@ -60,6 +60,8 @@ class Config:
     financiacion_pct: float = 0.0
     interes_hipoteca: float = 0.03
     anios_hipoteca: int = 25
+    # % por debajo de la mediana de €/m² de su zona para marcar un piso como "chollo".
+    umbral_chollo: float = 10.0
 
     # Lista de buscadores a usar (derivada de motor_busqueda; no se edita a mano)
     motores: List[str] = field(default_factory=list)
@@ -131,6 +133,7 @@ class Config:
             self.financiacion_pct = 0.95
         self.interes_hipoteca = _decimal(self.interes_hipoteca, 0.03, minimo=0.0)
         self.anios_hipoteca = _entero(self.anios_hipoteca, 25, minimo=1)
+        self.umbral_chollo = _decimal(self.umbral_chollo, 10.0, minimo=0.0)
         if self.rentas_zona is None or not isinstance(self.rentas_zona, dict):
             self.rentas_zona = {}
         else:

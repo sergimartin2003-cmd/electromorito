@@ -38,6 +38,8 @@ class ParametrosRentabilidad:
     financiacion_pct: float = 0.0
     interes_hipoteca: float = 0.03
     anios_hipoteca: int = 25
+    # % por debajo de la mediana de €/m² de su zona para marcar un piso como "chollo".
+    umbral_chollo: float = 10.0
 
 
 # --- Lectura de números tolerante (formato español) ----------------------
@@ -194,6 +196,37 @@ def extraer_planta(texto: str) -> str:
     return m.group(1) if m else ""
 
 
+def tiene_terraza(texto: str) -> Optional[bool]:
+    """True si el anuncio menciona terraza; None si no dice nada."""
+    if not texto:
+        return None
+    return True if "terraza" in _normalizar(texto) else None
+
+
+def tiene_garaje(texto: str) -> Optional[bool]:
+    """True/False si el anuncio menciona (o niega) garaje/parking; None si no lo dice."""
+    if not texto:
+        return None
+    t = _normalizar(texto)
+    if any(f in t for f in ("sin garaje", "sin plaza de garaje", "sin parking")):
+        return False
+    if any(f in t for f in ("garaje", "parking", "plaza de aparcamiento")):
+        return True
+    return None
+
+
+def es_exterior(texto: str) -> Optional[bool]:
+    """True si es exterior, False si es interior, None si no se indica."""
+    if not texto:
+        return None
+    t = _normalizar(texto)
+    if "exterior" in t:
+        return True
+    if "interior" in t:
+        return False
+    return None
+
+
 # --- Estimación del alquiler por zona ------------------------------------
 def _normalizar(texto: str) -> str:
     """Minúsculas sin tildes ni signos, para comparar zonas de forma flexible."""
@@ -302,6 +335,44 @@ def analizar_apalancamiento(precio: Optional[float], alquiler_mensual: Optional[
     }
 
 
+def price_to_rent(precio: Optional[float],
+                  alquiler_mensual: Optional[float]) -> Optional[float]:
+    """PER (price-to-rent): años en recuperar la compra = precio ÷ (alquiler × 12)."""
+    if not precio or precio <= 0 or not alquiler_mensual or alquiler_mensual <= 0:
+        return None
+    return round(precio / (alquiler_mensual * 12), 1)
+
+
+def puntuacion(piso: dict, params: ParametrosRentabilidad) -> Optional[int]:
+    """Puntuación compuesta 0–100 para ordenar oportunidades (más alto = mejor).
+
+    Combina, de forma transparente:
+      - hasta 60 pts por rentabilidad neta (60 al llegar a `umbral_excelente`),
+      - hasta 25 pts por comprar por debajo de la mediana de €/m² de la zona,
+      - hasta 15 pts de calidad, restando por 'a reformar' (más presupuesto) y por
+        tener el alquiler estimado (dato menos fiable).
+    Devuelve None si el piso no tiene rentabilidad calculada.
+    """
+    neta = piso.get("rentabilidad_neta")
+    if neta is None:
+        return None
+    tope = params.umbral_excelente or 8.0
+    pts = max(0.0, min(60.0, neta / tope * 60.0))
+
+    desc = piso.get("descuento_zona")
+    if desc is not None and desc > 0:
+        pts += min(25.0, desc / 15.0 * 25.0)
+
+    calidad = 15.0
+    if piso.get("estado") == "a reformar":
+        calidad -= 10.0
+    if piso.get("alquiler_estimado"):
+        calidad -= 5.0
+    pts += max(0.0, calidad)
+
+    return int(round(min(100.0, pts)))
+
+
 def clasificar_rentabilidad(pct: Optional[float],
                             params: ParametrosRentabilidad) -> str:
     """Etiqueta la rentabilidad neta: 'excelente', 'buena', 'correcta', 'baja' o 'sin datos'."""
@@ -347,10 +418,16 @@ def evaluar_piso(fila: dict, params: ParametrosRentabilidad) -> dict:
     precio_m2 = round(precio / superficie) if (precio and superficie) else None
 
     # Datos cualitativos del anuncio (del texto o de columnas propias)
+    def _campo_bool(clave, extractor):
+        v = fila.get(clave)
+        return _a_booleano(v) if v not in (None, "") else extractor(texto)
+
     estado = (fila.get("estado") or "").strip() or extraer_estado(texto)
     planta = (fila.get("planta") or "").strip() or extraer_planta(texto)
-    ascensor = fila.get("ascensor")
-    ascensor = _a_booleano(ascensor) if ascensor not in (None, "") else tiene_ascensor(texto)
+    ascensor = _campo_bool("ascensor", tiene_ascensor)
+    terraza = _campo_bool("terraza", tiene_terraza)
+    garaje = _campo_bool("garaje", tiene_garaje)
+    exterior = _campo_bool("exterior", es_exterior)
 
     apalancamiento = analizar_apalancamiento(precio, alquiler, params) or {}
 
@@ -361,18 +438,26 @@ def evaluar_piso(fila: dict, params: ParametrosRentabilidad) -> dict:
         "precio": int(precio) if precio else None,
         "superficie": superficie,
         "precio_m2": precio_m2,
+        "mediana_zona_m2": None,   # lo rellena el orquestador con el dataset completo
+        "descuento_zona": None,
+        "es_chollo": False,
         "habitaciones": habitaciones,
         "estado": estado,
         "planta": planta,
         "ascensor": ascensor,
+        "terraza": terraza,
+        "garaje": garaje,
+        "exterior": exterior,
         "alquiler_mensual": int(alquiler) if alquiler else None,
         "alquiler_estimado": estimado,
         "rentabilidad_bruta": round(bruta, 2) if bruta is not None else None,
         "rentabilidad_neta": round(neta, 2) if neta is not None else None,
+        "per": price_to_rent(precio, alquiler),
         "clasificacion": clasificar_rentabilidad(neta, params),
         "cuota_hipoteca": apalancamiento.get("cuota_hipoteca"),
         "cash_flow_mensual": apalancamiento.get("cash_flow_mensual"),
         "rentabilidad_fondos_propios": apalancamiento.get("rentabilidad_fondos_propios"),
         "fondos_propios": apalancamiento.get("fondos_propios"),
+        "puntuacion": None,        # lo rellena el orquestador (depende del descuento de zona)
         "completo": neta is not None,
     }
