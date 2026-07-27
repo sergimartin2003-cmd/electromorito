@@ -2,8 +2,8 @@
 
 from types import SimpleNamespace
 
-from scraper.pisos import parsear_texto, procesar_con_config
-from scraper.web import _pagina_formulario
+from rentapisos.pisos import parsear_texto, procesar_con_config
+from rentapisos.web import _pagina_formulario
 
 CONFIG = SimpleNamespace(rentas_zona={"Madrid": 15}, usar_ia=False)
 

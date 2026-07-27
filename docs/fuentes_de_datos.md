@@ -14,7 +14,7 @@ pasar de prototipo a algo sostenible.
 
 ## 1. El esquema que consume el motor
 
-El motor (`scraper/rentabilidad.py` + `scraper/pisos.py`) espera una lista de
+El motor (`rentapisos/rentabilidad.py` + `rentapisos/pisos.py`) espera una lista de
 **anuncios** (diccionarios). Campos habituales (todos opcionales salvo los que hagan
 falta para el cálculo):
 
@@ -31,7 +31,7 @@ falta para el cálculo):
 | `descripcion` | Texto libre (de aquí se extraen datos que falten) |
 
 **Cualquier fuente que sepa producir esa lista encaja sin tocar el motor.** Ese es el
-punto de extensión: ver `scraper/fuentes.py`.
+punto de extensión: ver `rentapisos/fuentes.py`.
 
 ---
 
@@ -74,7 +74,7 @@ Muchas inmobiliarias y CRMs inmobiliarios publican sus carteras como **feed XML/
 (formatos tipo *Idealista Feeds*, *Inmovilla*, *Fotocasa Feed*, Kyero, etc.) o permiten
 exportar a CSV. Si eres inmobiliaria, colaboras con una, o llegas a un acuerdo, tienes
 una fuente legítima y estructurada. Mapea sus campos al esquema del motor
-(`normalizar_anuncio` en `scraper/fuentes.py` ayuda con los nombres de columna).
+(`normalizar_anuncio` en `rentapisos/fuentes.py` ayuda con los nombres de columna).
 
 ### 3.3. Datos públicos  (para *estimar* y *contextualizar*, no para listar)
 
@@ -103,7 +103,7 @@ cálculo… El modo `--pisos` acepta CSV/JSON/XLSX directamente.
 ```
    ┌─────────────────────────────┐        ┌──────────────────────────────┐
    │ Fuente (intercambiable)     │        │ Motor de rentabilidad         │
-   │  · FuenteArchivo (CSV/JSON) │        │  (scraper/rentabilidad.py)    │
+   │  · FuenteArchivo (CSV/JSON) │        │  (rentapisos/rentabilidad.py)    │
    │  · FuenteIdealistaAPI       │ ─────▶ │  · parsers                    │
    │  · FuenteFeedInmobiliaria   │ lista  │  · alquiler (zona/SERPAVI/IA) │
    │  · …                        │ de     │  · rentabilidad + hipoteca    │
@@ -112,7 +112,7 @@ cálculo… El modo `--pisos` acepta CSV/JSON/XLSX directamente.
                                           └──────────────────────────────┘
 ```
 
-- **`Fuente`** (interfaz en `scraper/fuentes.py`): cualquier origen implementa
+- **`Fuente`** (interfaz en `rentapisos/fuentes.py`): cualquier origen implementa
   `anuncios() -> list[dict]` devolviendo el esquema de la sección 1.
 - **`normalizar_anuncio`**: traduce nombres de campo alternativos (`m2`, `dormitorios`,
   `precio_venta`, `enlace`…) al esquema canónico, para enchufar feeds sin reescribir el

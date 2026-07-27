@@ -2,7 +2,7 @@
 
 import pytest
 
-from scraper.fuentes import (
+from rentapisos.fuentes import (
     FuenteArchivo,
     FuenteFeedInmobiliaria,
     FuenteIdealistaAPI,

@@ -1,7 +1,7 @@
 """Punto de entrada del análisis de rentabilidad de pisos.
 
-    python -m scraper --pisos pisos.csv     # genera CSV + panel HTML + informe
-    python -m scraper --web                 # interfaz web local (pega y analiza)
+    python -m rentapisos --pisos pisos.csv     # genera CSV + panel HTML + informe
+    python -m rentapisos --web                 # interfaz web local (pega y analiza)
 """
 
 from __future__ import annotations

@@ -2,7 +2,7 @@
 
 import csv
 
-from scraper.pisos import (
+from rentapisos.pisos import (
     CAMPOS_PISOS,
     cargar_pisos,
     cargar_rentas_zona_csv,
@@ -11,7 +11,7 @@ from scraper.pisos import (
     generar_informe_pisos,
     procesar_pisos,
 )
-from scraper.rentabilidad import ParametrosRentabilidad
+from rentapisos.rentabilidad import ParametrosRentabilidad
 
 PARAMS = ParametrosRentabilidad(rentas_zona={"Barcelona": 14})
 
@@ -73,7 +73,7 @@ def test_marca_duplicados():
 
 def test_rentas_referencia_estima_sin_config():
     from types import SimpleNamespace
-    from scraper.pisos import procesar_con_config
+    from rentapisos.pisos import procesar_con_config
     # Sin rentas_zona propias, pero con la tabla de referencia activada (Madrid ~16 €/m²)
     config = SimpleNamespace(usar_rentas_referencia=True)
     filas = [{"titulo": "Piso Madrid", "zona": "Madrid", "precio": "250000", "superficie": "90"}]
@@ -85,7 +85,7 @@ def test_rentas_referencia_estima_sin_config():
 
 def test_rentas_referencia_desactivable():
     from types import SimpleNamespace
-    from scraper.pisos import procesar_con_config
+    from rentapisos.pisos import procesar_con_config
     config = SimpleNamespace(usar_rentas_referencia=False)
     filas = [{"titulo": "Piso Madrid", "zona": "Madrid", "precio": "250000", "superficie": "90"}]
     pisos = procesar_con_config(config, filas)

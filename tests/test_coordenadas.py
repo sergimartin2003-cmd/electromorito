@@ -1,8 +1,8 @@
 """Tests de la geolocalización de zonas para el mapa."""
 
-from scraper.coordenadas import coordenada_de
-from scraper.pisos import procesar_pisos
-from scraper.rentabilidad import ParametrosRentabilidad
+from rentapisos.coordenadas import coordenada_de
+from rentapisos.pisos import procesar_pisos
+from rentapisos.rentabilidad import ParametrosRentabilidad
 
 PARAMS = ParametrosRentabilidad(rentas_zona={"Madrid": 15})
 

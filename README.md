@@ -175,8 +175,8 @@ electromorito/
 ├── requirements-dev.txt      # dependencias de test (pytest)
 ├── docs/
 │   └── fuentes_de_datos.md   # de dónde sacar los anuncios (legal) + arquitectura
-├── scraper/
-│   ├── __main__.py           # CLI (python -m scraper)
+├── rentapisos/
+│   ├── __main__.py           # CLI (python -m rentapisos)
 │   ├── config.py             # carga y valida config.yaml
 │   ├── rentabilidad.py       # motor de rentabilidad (parsers + cálculo)
 │   ├── rentas_referencia.py  # tabla orientativa de €/m²·mes por provincia

@@ -1,4 +1,4 @@
-# Dependencias solo para desarrollo/tests (no necesarias para usar el scraper)
+# Dependencias solo para desarrollo/tests (no necesarias para usar la herramienta)
 #   pip install -r requirements-dev.txt
 #   python -m pytest
 pytest>=7.0

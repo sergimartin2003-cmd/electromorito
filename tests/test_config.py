@@ -2,7 +2,7 @@
 
 import pytest
 
-from scraper.config import Config
+from rentapisos.config import Config
 
 
 def test_cargar_config_de_ejemplo():
@@ -36,5 +36,5 @@ def test_config_inexistente():
 def test_claves_desconocidas_se_ignoran(tmp_path):
     yaml = tmp_path / "c.yaml"
     yaml.write_text("gastos_pct: 0.25\nmotor_busqueda: duckduckgo\n", encoding="utf-8")
-    cfg = Config.cargar(str(yaml))          # 'motor_busqueda' (del scraper viejo) se ignora
+    cfg = Config.cargar(str(yaml))          # una clave desconocida como 'motor_busqueda' se ignora
     assert not hasattr(cfg, "motor_busqueda")

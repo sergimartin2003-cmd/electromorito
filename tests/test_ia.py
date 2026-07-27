@@ -2,8 +2,8 @@
 
 import json
 
-from scraper.ia import enriquecer_pisos, estimar_piso_ia
-from scraper.rentabilidad import ParametrosRentabilidad, evaluar_piso
+from rentapisos.ia import enriquecer_pisos, estimar_piso_ia
+from rentapisos.rentabilidad import ParametrosRentabilidad, evaluar_piso
 
 PARAMS = ParametrosRentabilidad(rentas_zona={"Madrid": 15})
 

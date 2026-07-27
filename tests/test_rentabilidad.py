@@ -1,6 +1,6 @@
 """Tests del motor de rentabilidad de pisos (parsers, cálculo y evaluación)."""
 
-from scraper.rentabilidad import (
+from rentapisos.rentabilidad import (
     ParametrosRentabilidad,
     _a_numero,
     analizar_apalancamiento,
@@ -289,24 +289,24 @@ def test_puntuacion_none_sin_rentabilidad():
 # --- Escenario de estrés y proyección ------------------------------------
 def test_rentabilidad_neta_estres_es_menor():
     p = ParametrosRentabilidad(gastos_pct=0.25, costes_compra_pct=0.11, estres_alquiler_pct=0.10)
-    from scraper.rentabilidad import rentabilidad_neta_estres
+    from rentapisos.rentabilidad import rentabilidad_neta_estres
     normal = rentabilidad_neta(180000, 900, p)
     estres = rentabilidad_neta_estres(180000, 900, p)
     assert estres < normal
 
 
 def test_estres_desactivado_es_none():
-    from scraper.rentabilidad import rentabilidad_neta_estres
+    from rentapisos.rentabilidad import rentabilidad_neta_estres
     assert rentabilidad_neta_estres(180000, 900, PARAMS) is None
 
 
 def test_proyeccion_desactivada_es_none():
-    from scraper.rentabilidad import proyeccion
+    from rentapisos.rentabilidad import proyeccion
     assert proyeccion(180000, 900, PARAMS) is None
 
 
 def test_proyeccion_calcula_ganancia_y_roi():
-    from scraper.rentabilidad import proyeccion
+    from rentapisos.rentabilidad import proyeccion
     p = ParametrosRentabilidad(gastos_pct=0.25, costes_compra_pct=0.11,
                                revalorizacion_anual=0.02, horizonte_anios=10)
     proy = proyeccion(200000, 1000, p)
@@ -317,7 +317,7 @@ def test_proyeccion_calcula_ganancia_y_roi():
 
 
 def test_precio_objetivo():
-    from scraper.rentabilidad import precio_objetivo
+    from rentapisos.rentabilidad import precio_objetivo
     p = ParametrosRentabilidad(gastos_pct=0.25, costes_compra_pct=0.11)
     # Alquiler 900 €/mes para lograr un 7 % neto => comprar por unos 104.247 €
     assert precio_objetivo(900, 7, p) == 104247
@@ -326,7 +326,7 @@ def test_precio_objetivo():
 
 
 def test_rentabilidad_neta_despues_impuestos():
-    from scraper.rentabilidad import rentabilidad_neta_despues_impuestos
+    from rentapisos.rentabilidad import rentabilidad_neta_despues_impuestos
     p = ParametrosRentabilidad(gastos_pct=0.25, costes_compra_pct=0.11,
                                tipo_irpf=0.30, reduccion_irpf=0.60)
     # rend. neto 8100; base 8100*0.4=3240; impuesto 972; neto tras IRPF 7128; /199800 => 3,57 %
@@ -336,13 +336,13 @@ def test_rentabilidad_neta_despues_impuestos():
 
 
 def test_irpf_desactivado_es_none():
-    from scraper.rentabilidad import rentabilidad_neta_despues_impuestos
+    from rentapisos.rentabilidad import rentabilidad_neta_despues_impuestos
     p = ParametrosRentabilidad(gastos_pct=0.25, costes_compra_pct=0.11, tipo_irpf=0.0)
     assert rentabilidad_neta_despues_impuestos(180000, 900, p) is None
 
 
 def test_irpf_con_hipoteca_deduce_intereses():
-    from scraper.rentabilidad import rentabilidad_neta_despues_impuestos
+    from rentapisos.rentabilidad import rentabilidad_neta_despues_impuestos
     sin_hip = ParametrosRentabilidad(gastos_pct=0.25, costes_compra_pct=0.11,
                                      tipo_irpf=0.30, reduccion_irpf=0.60)
     con_hip = ParametrosRentabilidad(gastos_pct=0.25, costes_compra_pct=0.11,
